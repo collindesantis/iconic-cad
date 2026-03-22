@@ -40,7 +40,12 @@ wall_instances.yaml     # Wall module specifications
 icons/                  # SVG icons + Inkscape snap template
 examples/               # Hand-made floor plan layouts
 docs/                   # Protocol slides, replication documentation
+legacy/                 # Earlier compiler iterations
 ```
+
+## Legacy
+
+`legacy/compile_house_loop.py` is Marcin's original compiler which assembles walls by clustering icons into N/S/E/W runs and walking them sequentially. It works for rectangular buildings but cannot handle L-shapes, T-shapes, or other non-rectangular layouts. The current `compile_house.py` replaces this approach with port-based graph assembly.
 
 ## License
 
