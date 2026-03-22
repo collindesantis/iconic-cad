@@ -4,6 +4,15 @@ A pipeline for designing houses by arranging visual icons in Inkscape SVG layout
 
 Developed as part of [Open Source Ecology](http://opensourceecology.org). See the [wiki page](https://wiki.opensourceecology.org/wiki/Iconic_CAD_Workflow_Example) for full project context.
 
+## Status
+
+**Work in progress.** The core pipeline runs end-to-end but has known issues:
+
+- Port-based compiler assembles simple rectangles correctly
+- L-shaped and complex layouts partially compile — BFS traversal breaks when duplicate icons occupy the same grid cell, causing the adjacency graph to lose connectivity
+- Corner inset logic produces excess wall modules that overhang at building corners
+- See [open issues](https://github.com/collindesantis/iconic-cad/issues) for details
+
 ## How it works
 
 1. **YAML schema** defines wall module specs (lumber size, stud spacing, OSB thickness)
@@ -19,7 +28,12 @@ sudo pacman -S freecad python-yaml   # Arch Linux
 
 ## Quick start
 
-Generate the part library (requires FreeCAD separately — see wiki):
+Generate the part library with port markers:
+```bash
+freecadcmd -c "import sys; sys.argv=['generate_wall_library.py','wall_instances.yaml']; exec(open('generate_wall_library.py').read())"
+```
+
+Generate SVG icons for Inkscape:
 ```bash
 python generate_icons.py wall_instances.yaml
 ```
@@ -35,6 +49,7 @@ Open the resulting `.FCStd` file in FreeCAD to view.
 
 ```
 compile_house.py        # Port-based house compiler (graph/BFS assembly)
+generate_wall_library.py # Generate FreeCAD wall modules with port markers
 generate_icons.py       # Auto-generate SVG icons from YAML with metadata
 wall_instances.yaml     # Wall module specifications
 icons/                  # SVG icons + Inkscape snap template
