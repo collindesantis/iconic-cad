@@ -419,6 +419,8 @@ def assemble(icons, out_file):
 
     obj = doc.addObject("Part::Feature", f"wall_{count:02d}_{seed['id']}")
     obj.Shape = shp
+    if obj.ViewObject:
+        obj.ViewObject.Visibility = True
     count += 1
 
     placed[(seed["gx"], seed["gy"])] = {
@@ -464,6 +466,8 @@ def assemble(icons, out_file):
 
             obj = doc.addObject("Part::Feature", f"wall_{count:02d}_{nb_icon['id']}")
             obj.Shape = n_shp
+            if obj.ViewObject:
+                obj.ViewObject.Visibility = True
             count += 1
 
             placed[nk] = {

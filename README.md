@@ -8,9 +8,9 @@ Developed as part of [Open Source Ecology](http://opensourceecology.org). See th
 
 **Work in progress.** The core pipeline runs end-to-end but has known issues:
 
-- Port-based compiler assembles simple rectangles correctly
-- L-shaped and complex layouts partially compile — BFS traversal breaks when duplicate icons occupy the same grid cell, causing the adjacency graph to lose connectivity
-- Corner inset logic produces excess wall modules that overhang at building corners
+- Straight wall runs assemble correctly for all orientations (N, S, E, W)
+- Full L-shaped buildings compile with all modules placed (60 walls)
+- Corner alignment is broken at every horizontal/vertical wall transition — walls are offset or overlapping where N/S meets E/W
 - See [open issues](https://github.com/collindesantis/iconic-cad/issues) for details
 
 ## How it works
