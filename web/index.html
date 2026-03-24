@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Iconic CAD — Wall Layout</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, sans-serif; display: flex; height: 100vh; background: #1a1a2e; color: #eee; }
+
+/* Sidebar */
+#sidebar {
+  width: 220px;
+  background: #16213e;
+  padding: 12px;
+  overflow-y: auto;
+  border-right: 1px solid #333;
+  flex-shrink: 0;
+}
+#sidebar h2 { font-size: 14px; margin-bottom: 8px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
+.module-group { margin-bottom: 16px; }
+.module-group h3 { font-size: 12px; color: #888; margin-bottom: 6px; }
+.module-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.module-item {
+  width: 48px; height: 48px;
+  cursor: grab;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #f8f6f0;
+  display: flex; align-items: center; justify-content: center;
+}
+.module-item:hover { border-color: #4fc3f7; }
+.module-item img { width: 44px; height: 44px; pointer-events: none; }
+
+/* Canvas area */
+#canvas-wrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+#design-canvas {
+  position: absolute;
+  top: 0; left: 0;
+  cursor: crosshair;
+}
+
+/* Toolbar */
+#toolbar {
+  position: absolute;
+  top: 8px; right: 8px;
+  display: flex; gap: 6px;
+  z-index: 10;
+}
+#toolbar button {
+  padding: 6px 12px;
+  background: #16213e;
+  color: #eee;
+  border: 1px solid #444;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+#toolbar button:hover { background: #1a3a5c; border-color: #4fc3f7; }
+
+/* Status bar */
+#status {
+  position: absolute;
+  bottom: 8px; left: 8px;
+  font-size: 11px;
+  color: #888;
+  z-index: 10;
+}
+
+/* Snap indicator */
+.snap-highlight {
+  position: absolute;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: rgba(79, 195, 247, 0.6);
+  border: 2px solid #4fc3f7;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  z-index: 20;
+}
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <h2>Wall Modules</h2>
+  <div id="module-library"></div>
+  <hr style="border-color:#333; margin: 12px 0;">
+  <div style="font-size:11px; color:#666; line-height:1.4;">
+    Drag a module onto the canvas. It will snap to ports on existing walls.
+    <br><br>
+    Darkened border = exterior (OSB) side.
+  </div>
+</div>
+
+<div id="canvas-wrap">
+  <canvas id="design-canvas"></canvas>
+  <div id="toolbar">
+    <button onclick="clearAll()">Clear</button>
+    <button onclick="undoLast()">Undo</button>
+    <button onclick="exportJSON()">Export JSON</button>
+  </div>
+  <div id="status">Click and drag modules from the library</div>
+</div>
+
+<script>
+// =====================================================
+// MODULE DEFINITIONS
+// =====================================================
+const IN_TO_MM = 25.4;
+const WALL_DEPTH = (5.5 + 0.4375) * IN_TO_MM; // 150.8125mm
+
+const MODULES = [
+  { id: 'wall_4x8_2x6_16oc', label: '4x8 16OC', width_mm: 4 * 12 * IN_TO_MM, depth_mm: WALL_DEPTH },
+  { id: 'wall_4x8_2x6_24oc', label: '4x8 24OC', width_mm: 4 * 12 * IN_TO_MM, depth_mm: WALL_DEPTH },
+  { id: 'wall_3x8.5_2x6_16oc', label: '3x8.5 16OC', width_mm: 3 * 12 * IN_TO_MM, depth_mm: WALL_DEPTH },
+];
+
+const DIRECTIONS = ['north', 'south', 'east', 'west'];
+
+// Display scale: mm to canvas pixels
+const SCALE = 0.25; // 1mm = 0.25px → 4ft wall = ~305px... too big
+// Let's use a smaller scale
+const PX_PER_MM = 0.15; // 4ft wall ≈ 183px on screen
+
+function mmToPx(mm) { return mm * PX_PER_MM; }
+function pxToMm(px) { return px / PX_PER_MM; }
+
+function isHorizontal(dir) { return dir === 'north' || dir === 'south'; }
+
+// After rotation, bbox dimensions
+function getModuleBBox(mod, dir) {
+  if (isHorizontal(dir)) {
+    return { w: mod.width_mm, h: mod.depth_mm };
+  } else {
+    return { w: mod.depth_mm, h: mod.width_mm };
+  }
+}
+
+// Port positions relative to module origin (top-left of bbox)
+// 4 corner ports — user chooses which corner to snap to.
+// Straight runs: snap TL↔TR or BL↔BR (same edge alignment)
+// Corners: snap corner-to-corner for flush perpendicular joints
+function getPortPositions(mod, dir) {
+  const bb = getModuleBBox(mod, dir);
+  return [
+    { x: 0,    y: 0,    label: 'TL' },
+    { x: bb.w, y: 0,    label: 'TR' },
+    { x: 0,    y: bb.h, label: 'BL' },
+    { x: bb.w, y: bb.h, label: 'BR' },
+  ];
+}
+
+// =====================================================
+// STATE
+// =====================================================
+const placed = []; // { mod, dir, x_mm, y_mm, id }
+let dragState = null; // { mod, dir, iconSrc }
+let snapTarget = null; // { x_mm, y_mm } or null
+let mouseCanvasX = 0, mouseCanvasY = 0;
+let nextId = 0;
+
+// Canvas offset (for panning — future)
+let offsetX = 400, offsetY = 300;
+
+// =====================================================
+// CANVAS
+// =====================================================
+const canvas = document.getElementById('design-canvas');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('canvas-wrap');
+
+function resizeCanvas() {
+  canvas.width = wrap.clientWidth;
+  canvas.height = wrap.clientHeight;
+  draw();
+}
+window.addEventListener('resize', resizeCanvas);
+
+// Icon image cache
+const iconImages = {};
+function loadIcon(modId, dir) {
+  const key = `${modId}_${dir}`;
+  if (iconImages[key]) return iconImages[key];
+  const img = new Image();
+  img.src = `../icons/${key}.svg`;
+  img.onload = () => draw();
+  iconImages[key] = img;
+  return img;
+}
+
+// Preload all icons
+MODULES.forEach(mod => {
+  DIRECTIONS.forEach(dir => loadIcon(mod.id, dir));
+});
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Background grid
+  ctx.strokeStyle = '#252540';
+  ctx.lineWidth = 1;
+  const gridPx = mmToPx(12 * IN_TO_MM); // 1ft grid
+  for (let x = offsetX % gridPx; x < canvas.width; x += gridPx) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+  }
+  for (let y = offsetY % gridPx; y < canvas.height; y += gridPx) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+  }
+
+  // Draw placed modules
+  placed.forEach((p, i) => {
+    const bb = getModuleBBox(p.mod, p.dir);
+    const px = offsetX + mmToPx(p.x_mm);
+    const py = offsetY + mmToPx(p.y_mm);
+    const pw = mmToPx(bb.w);
+    const ph = mmToPx(bb.h);
+
+    // Module fill
+    ctx.fillStyle = '#2a3a5c';
+    ctx.strokeStyle = '#4fc3f7';
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(px, py, pw, ph);
+    ctx.strokeRect(px, py, pw, ph);
+
+    // Direction indicator (darkened side = OSB/exterior)
+    ctx.fillStyle = 'rgba(79, 195, 247, 0.3)';
+    const d = mmToPx(p.mod.depth_mm) * 0.3;
+    if (p.dir === 'north') ctx.fillRect(px, py, pw, d);
+    else if (p.dir === 'south') ctx.fillRect(px, py + ph - d, pw, d);
+    else if (p.dir === 'west') ctx.fillRect(px, py, d, ph);
+    else if (p.dir === 'east') ctx.fillRect(px + pw - d, py, d, ph);
+
+    // Label
+    ctx.fillStyle = '#aaa';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(p.dir[0].toUpperCase(), px + pw/2, py + ph/2 + 4);
+
+    // Draw ports
+    const ports = getPortPositions(p.mod, p.dir);
+    ports.forEach(port => {
+      const ppx = px + mmToPx(port.x);
+      const ppy = py + mmToPx(port.y);
+      ctx.fillStyle = '#4fc3f7';
+      ctx.beginPath();
+      ctx.arc(ppx, ppy, 3, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  });
+
+  // Draw snap indicator
+  if (snapTarget && dragState) {
+    const sx = offsetX + mmToPx(snapTarget.x_mm);
+    const sy = offsetY + mmToPx(snapTarget.y_mm);
+    ctx.strokeStyle = '#4fc3f7';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(sx, sy, 8, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Preview the module at snap position
+    const bb = getModuleBBox(dragState.mod, dragState.dir);
+    const pw = mmToPx(bb.w);
+    const ph = mmToPx(bb.h);
+    ctx.fillStyle = 'rgba(79, 195, 247, 0.15)';
+    ctx.strokeStyle = 'rgba(79, 195, 247, 0.5)';
+    ctx.lineWidth = 1;
+    ctx.fillRect(sx, sy, pw, ph);
+    ctx.strokeRect(sx, sy, pw, ph);
+  }
+
+  // Draw drag preview at cursor
+  if (dragState && !snapTarget) {
+    const bb = getModuleBBox(dragState.mod, dragState.dir);
+    const pw = mmToPx(bb.w);
+    const ph = mmToPx(bb.h);
+    ctx.fillStyle = 'rgba(79, 195, 247, 0.1)';
+    ctx.strokeStyle = 'rgba(79, 195, 247, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.fillRect(mouseCanvasX - pw/2, mouseCanvasY - ph/2, pw, ph);
+    ctx.strokeRect(mouseCanvasX - pw/2, mouseCanvasY - ph/2, pw, ph);
+  }
+
+  // Status
+  const status = document.getElementById('status');
+  if (dragState) {
+    status.textContent = snapTarget
+      ? `Snap: (${snapTarget.x_mm.toFixed(0)}, ${snapTarget.y_mm.toFixed(0)}) mm`
+      : `Dragging ${dragState.mod.label} ${dragState.dir}`;
+  } else {
+    status.textContent = `${placed.length} modules placed`;
+  }
+}
+
+// =====================================================
+// SNAP LOGIC
+// =====================================================
+const SNAP_DIST_PX = 25;
+
+function findSnap(cursorX_mm, cursorY_mm, mod, dir) {
+  const bb = getModuleBBox(mod, dir);
+  const dragPorts = getPortPositions(mod, dir);
+
+  let bestDist = Infinity;
+  let bestSnap = null;
+
+  // If no modules placed, snap to cursor position (free placement)
+  if (placed.length === 0) {
+    return { x_mm: cursorX_mm - bb.w / 2, y_mm: cursorY_mm - bb.h / 2 };
+  }
+
+  // Check each placed module's ports against drag module's ports
+  for (const p of placed) {
+    const pPorts = getPortPositions(p.mod, p.dir);
+    for (const pp of pPorts) {
+      const ppAbs = { x: p.x_mm + pp.x, y: p.y_mm + pp.y };
+
+      for (const dp of dragPorts) {
+        // If drag port snaps to placed port, compute module origin
+        const snapOrigin = {
+          x_mm: ppAbs.x - dp.x,
+          y_mm: ppAbs.y - dp.y,
+        };
+        // Distance from cursor to where module center would be
+        const cx = snapOrigin.x_mm + bb.w / 2;
+        const cy = snapOrigin.y_mm + bb.h / 2;
+        const dist = Math.hypot(mmToPx(cx - cursorX_mm), mmToPx(cy - cursorY_mm));
+
+        if (dist < SNAP_DIST_PX * 3 && dist < bestDist) {
+          // Check no overlap with existing modules
+          if (!wouldOverlap(snapOrigin.x_mm, snapOrigin.y_mm, bb, mod, dir)) {
+            bestDist = dist;
+            bestSnap = snapOrigin;
+          }
+        }
+      }
+    }
+  }
+
+  return bestSnap;
+}
+
+function wouldOverlap(x, y, bb, mod, dir) {
+  // Allow small corner-zone overlaps (perpendicular walls share a D×D zone)
+  // but reject large overlaps (module stacking on top of each other)
+  const maxAllowed = WALL_DEPTH * WALL_DEPTH * 1.5; // ~D² with some tolerance
+  for (const p of placed) {
+    const pbb = getModuleBBox(p.mod, p.dir);
+    const overlapW = Math.min(x + bb.w, p.x_mm + pbb.w) - Math.max(x, p.x_mm);
+    const overlapH = Math.min(y + bb.h, p.y_mm + pbb.h) - Math.max(y, p.y_mm);
+    if (overlapW > 0 && overlapH > 0) {
+      const overlapArea = overlapW * overlapH;
+      if (overlapArea > maxAllowed) return true;
+    }
+  }
+  return false;
+}
+
+// =====================================================
+// EVENT HANDLERS
+// =====================================================
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  mouseCanvasX = e.clientX - rect.left;
+  mouseCanvasY = e.clientY - rect.top;
+
+  if (dragState) {
+    const mx = pxToMm(mouseCanvasX - offsetX);
+    const my = pxToMm(mouseCanvasY - offsetY);
+    snapTarget = findSnap(mx, my, dragState.mod, dragState.dir);
+    draw();
+  }
+});
+
+canvas.addEventListener('click', (e) => {
+  if (dragState) {
+    const rect = canvas.getBoundingClientRect();
+    const mx = pxToMm((e.clientX - rect.left) - offsetX);
+    const my = pxToMm((e.clientY - rect.top) - offsetY);
+
+    let pos = snapTarget;
+    if (!pos && placed.length === 0) {
+      // First module: free placement
+      const bb = getModuleBBox(dragState.mod, dragState.dir);
+      pos = { x_mm: mx - bb.w / 2, y_mm: my - bb.h / 2 };
+    }
+    if (pos) {
+      placed.push({
+        mod: dragState.mod,
+        dir: dragState.dir,
+        x_mm: pos.x_mm,
+        y_mm: pos.y_mm,
+        id: `wall_${nextId++}`,
+      });
+      snapTarget = null;
+      draw();
+    }
+  }
+});
+
+canvas.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  if (dragState) {
+    dragState = null;
+    snapTarget = null;
+    draw();
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    dragState = null;
+    snapTarget = null;
+    draw();
+  }
+});
+
+// =====================================================
+// SIDEBAR
+// =====================================================
+function buildSidebar() {
+  const lib = document.getElementById('module-library');
+  MODULES.forEach(mod => {
+    const group = document.createElement('div');
+    group.className = 'module-group';
+    group.innerHTML = `<h3>${mod.label}</h3>`;
+    const grid = document.createElement('div');
+    grid.className = 'module-grid';
+
+    DIRECTIONS.forEach(dir => {
+      const item = document.createElement('div');
+      item.className = 'module-item';
+      item.title = `${mod.label} — ${dir}`;
+      const img = document.createElement('img');
+      img.src = `../icons/${mod.id}_${dir}.svg`;
+      item.appendChild(img);
+
+      item.addEventListener('click', () => {
+        dragState = { mod, dir };
+        snapTarget = null;
+        canvas.style.cursor = 'copy';
+        draw();
+      });
+
+      grid.appendChild(item);
+    });
+
+    group.appendChild(grid);
+    lib.appendChild(group);
+  });
+}
+
+// =====================================================
+// TOOLBAR ACTIONS
+// =====================================================
+function clearAll() {
+  placed.length = 0;
+  nextId = 0;
+  dragState = null;
+  snapTarget = null;
+  draw();
+}
+
+function undoLast() {
+  if (placed.length > 0) {
+    placed.pop();
+    draw();
+  }
+}
+
+function exportJSON() {
+  const data = {
+    modules: placed.map(p => ({
+      id: p.id,
+      module: p.mod.id,
+      direction: p.dir,
+      x_mm: Math.round(p.x_mm * 100) / 100,
+      y_mm: Math.round(p.y_mm * 100) / 100,
+      width_mm: p.mod.width_mm,
+      depth_mm: p.mod.depth_mm,
+    })),
+    metadata: {
+      exported: new Date().toISOString(),
+      count: placed.length,
+    }
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'layout.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// =====================================================
+// INIT
+// =====================================================
+buildSidebar();
+resizeCanvas();
+</script>
+</body>
+</html>
