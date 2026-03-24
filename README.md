@@ -43,6 +43,8 @@ Open http://localhost:8080/web/ in your browser.
 freecadcmd -c "import sys; sys.argv=['compile_from_json.py','layout.json']; exec(open('compile_from_json.py').read())"
 ```
 
+Replace `layout.json` with whatever your exported file is named (e.g. `layout(2).json`). The output `.FCStd` file will have the same name.
+
 ### 6. View the result
 
 Open the resulting `.FCStd` file in FreeCAD.
