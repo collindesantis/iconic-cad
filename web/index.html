@@ -123,6 +123,18 @@ body { font-family: -apple-system, sans-serif; display: flex; height: 100vh; bac
   font-weight: bold;
 }
 #right-sidebar .btn-export:hover { background: #388e3c; }
+#right-sidebar .btn-save, #right-sidebar .btn-load {
+  flex: 1;
+  padding: 8px;
+  background: #16213e;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #eee;
+  cursor: pointer;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+#right-sidebar .btn-save:hover, #right-sidebar .btn-load:hover { border-color: #4fc3f7; }
 
 /* Status bar */
 #status {
@@ -204,6 +216,11 @@ body { font-family: -apple-system, sans-serif; display: flex; height: 100vh; bac
   <div class="sidebar-title">// 3D PREVIEW //</div>
   <div id="preview-placeholder">Loading...</div>
   <div style="flex:1;"></div>
+  <div style="display:flex; gap:6px; margin-bottom:6px;">
+    <button class="btn-save" onclick="saveLayout()">Save</button>
+    <button class="btn-load" onclick="document.getElementById('load-input').click()">Load</button>
+  </div>
+  <input type="file" id="load-input" accept=".json" style="display:none;" onchange="loadLayout(event)">
   <button class="btn-export" onclick="exportJSON()">Export</button>
 </div>
 
@@ -746,6 +763,53 @@ function exportJSON() {
   a.download = 'layout.json';
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function saveLayout() {
+  const data = {
+    modules: placed.map(p => ({
+      id: p.id,
+      module: p.mod.id,
+      direction: p.dir,
+      x_mm: Math.round(p.x_mm * 100) / 100,
+      y_mm: Math.round(p.y_mm * 100) / 100,
+    })),
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'layout-save.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function loadLayout(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const data = JSON.parse(e.target.result);
+    placed.length = 0;
+    history.length = 0;
+    future.length = 0;
+    nextId = 0;
+    for (const m of data.modules) {
+      const mod = MODULES.find(mod => mod.id === m.module);
+      if (!mod) { console.warn(`Unknown module: ${m.module}`); continue; }
+      placed.push({
+        mod: mod,
+        dir: m.direction,
+        x_mm: m.x_mm,
+        y_mm: m.y_mm,
+        id: m.id || `wall_${nextId}`,
+      });
+      nextId++;
+    }
+    draw();
+  };
+  reader.readAsText(file);
+  event.target.value = '';
 }
 
 // =====================================================

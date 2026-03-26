@@ -6,13 +6,11 @@
 ## Todo
 - [ ] 3D preview in browser (three.js)
 - [ ] Bill of materials estimator panel below the 3D preview
-- [ ] Additional hotkeys as needed
 - [ ] Interior walls (ladder blocking or continuous blocking options)
 - [ ] Staging/phasing system: walls first, then roof, then plumbing/elec, then interior
 - [ ] Library view toggle: swap between icon view and image preview of actual module
 - [ ] Save/load layouts (localStorage or file)
 - [ ] Live building dimensions display (total width x depth in feet)
-- [ ] Pan with left mouse drag (currently middle mouse only)
 - [ ] Mobile/tablet support
 - [ ] OSB notching detection at corners
 
