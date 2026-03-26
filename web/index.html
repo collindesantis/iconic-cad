@@ -7,6 +7,7 @@
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, sans-serif; display: flex; height: 100vh; background: #1a1a2e; color: #eee; }
+#main-area { flex: 1; display: flex; flex-direction: column; position: relative; }
 
 /* Sidebar */
 #sidebar {
@@ -16,6 +17,16 @@ body { font-family: -apple-system, sans-serif; display: flex; height: 100vh; bac
   overflow-y: auto;
   border-right: 1px solid #333;
   flex-shrink: 0;
+}
+.sidebar-title {
+  font-size: 13px;
+  color: #667;
+  text-align: center;
+  letter-spacing: 3px;
+  padding: 8px 0 12px;
+  border-bottom: 1px solid #333;
+  margin-bottom: 12px;
+  font-weight: bold;
 }
 #sidebar h2 { font-size: 14px; margin-bottom: 8px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
 .module-group { margin-bottom: 16px; }
@@ -37,6 +48,7 @@ body { font-family: -apple-system, sans-serif; display: flex; height: 100vh; bac
   flex: 1;
   position: relative;
   overflow: hidden;
+  min-height: 0;
 }
 #design-canvas {
   position: absolute;
@@ -44,10 +56,10 @@ body { font-family: -apple-system, sans-serif; display: flex; height: 100vh; bac
   cursor: crosshair;
 }
 
-/* Toolbar */
+/* Toolbar (top-left of canvas) */
 #toolbar {
   position: absolute;
-  top: 8px; right: 8px;
+  top: 8px; left: 8px;
   display: flex; gap: 6px;
   z-index: 10;
 }
@@ -60,7 +72,48 @@ body { font-family: -apple-system, sans-serif; display: flex; height: 100vh; bac
   cursor: pointer;
   font-size: 12px;
 }
-#toolbar button:hover { background: #1a3a5c; border-color: #4fc3f7; }
+#toolbar button:hover { border-color: #4fc3f7; }
+#toolbar .btn-clear {
+  background: #c62828;
+  border-color: #e53935;
+}
+#toolbar .btn-clear:hover { background: #d32f2f; }
+
+/* Right sidebar */
+#right-sidebar {
+  width: 220px;
+  background: #16213e;
+  padding: 12px;
+  border-left: 1px solid #333;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+#preview-placeholder {
+  width: 196px;
+  height: 196px;
+  background: #111828;
+  border: 1px solid #333;
+  border-radius: 4px;
+  margin: 12px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+  font-size: 11px;
+}
+#right-sidebar .btn-export {
+  width: 100%;
+  padding: 10px;
+  background: #2e7d32;
+  border: 1px solid #43a047;
+  border-radius: 4px;
+  color: #eee;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+}
+#right-sidebar .btn-export:hover { background: #388e3c; }
 
 /* Status bar */
 #status {
@@ -70,6 +123,30 @@ body { font-family: -apple-system, sans-serif; display: flex; height: 100vh; bac
   color: #888;
   z-index: 10;
 }
+
+/* Footer bar */
+#footer-bar {
+  height: 40px;
+  flex-shrink: 0;
+  background: #16213e;
+  border-top: 1px solid #333;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  z-index: 10;
+}
+#footer-bar button {
+  padding: 6px 16px;
+  background: #2a3a5c;
+  color: #4fc3f7;
+  border: 1px solid #4fc3f7;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+#footer-bar button:hover { background: #1a3a5c; }
 
 /* Snap indicator */
 .snap-highlight {
@@ -87,7 +164,7 @@ body { font-family: -apple-system, sans-serif; display: flex; height: 100vh; bac
 <body>
 
 <div id="sidebar">
-  <h2>Wall Modules</h2>
+  <div class="sidebar-title">/// LIBRARY ///</div>
   <div id="module-library"></div>
   <hr style="border-color:#333; margin: 12px 0;">
   <div style="font-size:11px; color:#666; line-height:1.4;">
@@ -97,14 +174,26 @@ body { font-family: -apple-system, sans-serif; display: flex; height: 100vh; bac
   </div>
 </div>
 
-<div id="canvas-wrap">
-  <canvas id="design-canvas"></canvas>
-  <div id="toolbar">
-    <button onclick="clearAll()">Clear</button>
-    <button onclick="undoLast()">Undo</button>
-    <button onclick="exportJSON()">Export JSON</button>
+<div id="main-area">
+  <div id="canvas-wrap">
+    <canvas id="design-canvas"></canvas>
+    <div id="toolbar">
+      <button class="btn-clear" onclick="clearAll()">Clear</button>
+      <button onclick="undoLast()">&#x21A9; Undo</button>
+      <button onclick="redoLast()">Redo &#x21AA;</button>
+    </div>
+    <div id="status">Click and drag modules from the library</div>
   </div>
-  <div id="status">Click and drag modules from the library</div>
+  <div id="footer-bar">
+    <button>FRAMING</button>
+  </div>
+</div>
+
+<div id="right-sidebar">
+  <div class="sidebar-title">// 3D PREVIEW //</div>
+  <div id="preview-placeholder">Loading...</div>
+  <div style="flex:1;"></div>
+  <button class="btn-export" onclick="exportJSON()">Export</button>
 </div>
 
 <script>
@@ -397,6 +486,7 @@ canvas.addEventListener('click', (e) => {
         y_mm: pos.y_mm,
         id: `wall_${nextId++}`,
       });
+      redone.length = 0;
       snapTarget = null;
       draw();
     }
@@ -458,8 +548,11 @@ function buildSidebar() {
 // =====================================================
 // TOOLBAR ACTIONS
 // =====================================================
+const redone = [];
+
 function clearAll() {
   placed.length = 0;
+  redone.length = 0;
   nextId = 0;
   dragState = null;
   snapTarget = null;
@@ -468,7 +561,14 @@ function clearAll() {
 
 function undoLast() {
   if (placed.length > 0) {
-    placed.pop();
+    redone.push(placed.pop());
+    draw();
+  }
+}
+
+function redoLast() {
+  if (redone.length > 0) {
+    placed.push(redone.pop());
     draw();
   }
 }
