@@ -214,10 +214,13 @@ const DIRECTIONS = ['north', 'south', 'east', 'west'];
 // Display scale: mm to canvas pixels
 const SCALE = 0.25; // 1mm = 0.25px → 4ft wall = ~305px... too big
 // Let's use a smaller scale
-const PX_PER_MM = 0.15; // 4ft wall ≈ 183px on screen
+let zoomLevel = 0.15; // PX_PER_MM — 4ft wall ≈ 183px at default
+const ZOOM_MIN = 0.05;
+const ZOOM_MAX = 0.5;
+const ZOOM_STEP = 1.1;
 
-function mmToPx(mm) { return mm * PX_PER_MM; }
-function pxToMm(px) { return px / PX_PER_MM; }
+function mmToPx(mm) { return mm * zoomLevel; }
+function pxToMm(px) { return px / zoomLevel; }
 
 function isHorizontal(dir) { return dir === 'north' || dir === 'south'; }
 
@@ -453,16 +456,65 @@ function wouldOverlap(x, y, bb, mod, dir) {
 // =====================================================
 // EVENT HANDLERS
 // =====================================================
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  // Zoom toward cursor position
+  const oldZoom = zoomLevel;
+  if (e.deltaY < 0) {
+    zoomLevel = Math.min(ZOOM_MAX, zoomLevel * ZOOM_STEP);
+  } else {
+    zoomLevel = Math.max(ZOOM_MIN, zoomLevel / ZOOM_STEP);
+  }
+  const scale = zoomLevel / oldZoom;
+  offsetX = mx - (mx - offsetX) * scale;
+  offsetY = my - (my - offsetY) * scale;
+  draw();
+}, { passive: false });
+
+let isPanning = false;
+let panStartX = 0, panStartY = 0;
+
+canvas.addEventListener('mousedown', (e) => {
+  if (e.button === 1) {
+    // Middle mouse button — start panning
+    e.preventDefault();
+    isPanning = true;
+    panStartX = e.clientX;
+    panStartY = e.clientY;
+    canvas.style.cursor = 'grabbing';
+  }
+});
+
 canvas.addEventListener('mousemove', (e) => {
   const rect = canvas.getBoundingClientRect();
   mouseCanvasX = e.clientX - rect.left;
   mouseCanvasY = e.clientY - rect.top;
+
+  if (isPanning) {
+    offsetX += e.clientX - panStartX;
+    offsetY += e.clientY - panStartY;
+    panStartX = e.clientX;
+    panStartY = e.clientY;
+    draw();
+    return;
+  }
 
   if (dragState) {
     const mx = pxToMm(mouseCanvasX - offsetX);
     const my = pxToMm(mouseCanvasY - offsetY);
     snapTarget = findSnap(mx, my, dragState.mod, dragState.dir);
     draw();
+  }
+});
+
+canvas.addEventListener('mouseup', (e) => {
+  if (e.button === 1 && isPanning) {
+    isPanning = false;
+    canvas.style.cursor = dragState ? 'copy' : 'crosshair';
   }
 });
 
