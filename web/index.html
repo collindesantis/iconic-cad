@@ -191,6 +191,7 @@ body { font-family: -apple-system, sans-serif; display: flex; height: 100vh; bac
       <button onclick="undoLast()">&#x21A9; Undo</button>
       <button onclick="redoLast()">Redo &#x21AA;</button>
       <button id="btn-erase" class="btn-erase" onclick="toggleErase()">&#x2716; Erase</button>
+      <button id="btn-rotate" onclick="rotateCW()" style="display:none;">&#x21BB; Rotate (R)</button>
     </div>
     <div id="status">Click and drag modules from the library</div>
   </div>
@@ -398,6 +399,9 @@ function draw() {
   } else {
     status.textContent = `${placed.length} modules placed`;
   }
+
+  // Show/hide rotate button
+  document.getElementById('btn-rotate').style.display = dragState ? '' : 'none';
 }
 
 // =====================================================
@@ -578,11 +582,21 @@ canvas.addEventListener('contextmenu', (e) => {
   }
 });
 
+const ROTATE_CW = { north: 'east', east: 'south', south: 'west', west: 'north' };
+
+function rotateCW() {
+  if (!dragState) return;
+  dragState.dir = ROTATE_CW[dragState.dir];
+  snapTarget = null;
+  draw();
+}
+
 // Hotkey definitions: { key, ctrl, shift, action }
 const HOTKEYS = [
   { key: 'Escape', ctrl: false, shift: false, action: () => { dragState = null; snapTarget = null; eraseMode = false; document.getElementById('btn-erase').classList.remove('active'); canvas.style.cursor = 'crosshair'; draw(); }},
   { key: 'z', ctrl: true,  shift: false, action: undoLast },
   { key: 'z', ctrl: true,  shift: true,  action: redoLast },
+  { key: 'r', ctrl: false, shift: false, action: rotateCW },
 ];
 
 document.addEventListener('keydown', (e) => {
