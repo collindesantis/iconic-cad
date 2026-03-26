@@ -110,10 +110,11 @@ def build_wall(instance):
         s.translate(FreeCAD.Vector(in_mm(x_in), 0, plate_t))
         shapes.append(s)
 
-    # --- OSB sheathing: south face, Y = -osb..0 ---
-    osb_panel = Part.makeBox(W, osb, H)
-    osb_panel.translate(FreeCAD.Vector(0, -osb, 0))
-    shapes.append(osb_panel)
+    # --- OSB sheathing: south face, Y = -osb..0 (skip for interior walls) ---
+    if osb_thick_in > 0:
+        osb_panel = Part.makeBox(W, osb, H)
+        osb_panel.translate(FreeCAD.Vector(0, -osb, 0))
+        shapes.append(osb_panel)
 
     # --- Compound ---
     wall = Part.makeCompound(shapes)
@@ -126,7 +127,7 @@ def build_wall(instance):
     # Ports at the outer corners (OSB face, Y = -osb) so that when
     # two walls snap together at a corner, they meet at the building edge.
     half = PORT_SIZE / 2.0
-    port_y = -osb  # outer face (OSB surface)
+    port_y = -osb if osb > 0 else 0  # outer face (OSB surface), or stud face for interior walls
 
     # port_left: left (X=0) end, outer face, ground level
     pl = Part.makeBox(PORT_SIZE, PORT_SIZE, PORT_SIZE)

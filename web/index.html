@@ -194,6 +194,10 @@ body { font-family: -apple-system, sans-serif; display: flex; height: 100vh; bac
     Drag a module onto the canvas. It will snap to ports on existing walls.
     <br><br>
     Darkened border = exterior (OSB) side.
+    <br>
+    Dashed border = interior wall (no OSB).
+    <br><br>
+    Interior walls snap perpendicular to exterior walls. Press <b>C</b> or <b>T</b> to switch blocking mode before placing.
   </div>
 </div>
 
@@ -242,6 +246,16 @@ const MODULES = [
   { id: 'wall_3x8.5_2x6_16oc', label: '3x8.5 16OC', width_mm: 3 * 12 * IN_TO_MM, depth_mm: WALL_DEPTH },
 ];
 
+const IWALL_DEPTH = 3.5 * IN_TO_MM; // 88.9mm — 2x4 stud depth, no OSB
+
+const INTERIOR_MODULES = [
+  { id: 'iwall_4x8_2x4_16oc', label: '4x8 16OC', width_mm: 4 * 12 * IN_TO_MM, depth_mm: IWALL_DEPTH, interior: true },
+  { id: 'iwall_4x8_2x4_24oc', label: '4x8 24OC', width_mm: 4 * 12 * IN_TO_MM, depth_mm: IWALL_DEPTH, interior: true },
+  { id: 'iwall_3x8.5_2x4_single', label: '3x8.5 1S', width_mm: 3 * 12 * IN_TO_MM, depth_mm: IWALL_DEPTH, interior: true },
+];
+
+const ALL_MODULES = [...MODULES, ...INTERIOR_MODULES];
+
 const DIRECTIONS = ['north', 'south', 'east', 'west'];
 
 // Display scale: mm to canvas pixels
@@ -289,6 +303,7 @@ let eraseMode = false;
 let snapTarget = null; // { x_mm, y_mm } or null
 let mouseCanvasX = 0, mouseCanvasY = 0;
 let nextId = 0;
+let blockingMode = 'C'; // 'C' or 'T'
 
 // Canvas offset (for panning — future)
 let offsetX = 400, offsetY = 300;
@@ -320,7 +335,7 @@ function loadIcon(modId, dir) {
 }
 
 // Preload all icons
-MODULES.forEach(mod => {
+ALL_MODULES.forEach(mod => {
   DIRECTIONS.forEach(dir => loadIcon(mod.id, dir));
 });
 
@@ -346,26 +361,61 @@ function draw() {
     const pw = mmToPx(bb.w);
     const ph = mmToPx(bb.h);
 
-    // Module fill
-    ctx.fillStyle = '#2a3a5c';
-    ctx.strokeStyle = '#4fc3f7';
+    // Module fill — interior walls use different colors
+    const isInt = p.mod.interior;
+    ctx.fillStyle = isInt ? '#3a2a4c' : '#2a3a5c';
+    ctx.strokeStyle = isInt ? '#bb86fc' : '#4fc3f7';
     ctx.lineWidth = 1.5;
     ctx.fillRect(px, py, pw, ph);
+    if (isInt) {
+      ctx.setLineDash([4, 3]);
+    }
     ctx.strokeRect(px, py, pw, ph);
+    ctx.setLineDash([]);
 
-    // Direction indicator (darkened side = OSB/exterior)
-    ctx.fillStyle = 'rgba(79, 195, 247, 0.3)';
-    const d = mmToPx(p.mod.depth_mm) * 0.3;
-    if (p.dir === 'north') ctx.fillRect(px, py, pw, d);
-    else if (p.dir === 'south') ctx.fillRect(px, py + ph - d, pw, d);
-    else if (p.dir === 'west') ctx.fillRect(px, py, d, ph);
-    else if (p.dir === 'east') ctx.fillRect(px + pw - d, py, d, ph);
+    // Direction indicator (darkened side = OSB/exterior) — skip for interior walls
+    if (!isInt) {
+      ctx.fillStyle = 'rgba(79, 195, 247, 0.3)';
+      const d = mmToPx(p.mod.depth_mm) * 0.3;
+      if (p.dir === 'north') ctx.fillRect(px, py, pw, d);
+      else if (p.dir === 'south') ctx.fillRect(px, py + ph - d, pw, d);
+      else if (p.dir === 'west') ctx.fillRect(px, py, d, ph);
+      else if (p.dir === 'east') ctx.fillRect(px + pw - d, py, d, ph);
+    }
 
     // Label
-    ctx.fillStyle = '#aaa';
+    ctx.fillStyle = isInt ? '#bb86fc' : '#aaa';
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(p.dir[0].toUpperCase(), px + pw/2, py + ph/2 + 4);
+    ctx.fillText(isInt ? 'I' : p.dir[0].toUpperCase(), px + pw/2, py + ph/2 + 4);
+
+    // Blocking markers for interior wall connections — drawn on exterior side of wall
+    if (p.connections) {
+      for (const conn of p.connections) {
+        let mx = offsetX + mmToPx(conn.contact_x_mm);
+        let my = offsetY + mmToPx(conn.contact_y_mm);
+        // Offset marker to exterior side of target wall
+        const target = placed.find(q => q.id === conn.target_id);
+        if (target) {
+          const tbb = getModuleBBox(target.mod, target.dir);
+          const pad = 14;
+          if (target.dir === 'north') my -= mmToPx(tbb.h) + pad;
+          else if (target.dir === 'south') my += mmToPx(tbb.h) + pad;
+          else if (target.dir === 'east') mx += mmToPx(tbb.w) + pad;
+          else if (target.dir === 'west') mx -= mmToPx(tbb.w) + pad;
+        }
+        // Background circle — C1 blue, C2 blue-bright, T orange
+        ctx.fillStyle = conn.blocking === 'T' ? '#f57c00' : (conn.blocking === 'C2' ? '#1976d2' : '#1565c0');
+        ctx.beginPath();
+        ctx.arc(mx, my, 9, 0, Math.PI * 2);
+        ctx.fill();
+        // Letter — show "C1", "C2", or "T"
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 9px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(conn.blocking, mx, my + 3);
+      }
+    }
 
     // Draw ports
     const ports = getPortPositions(p.mod, p.dir);
@@ -425,6 +475,23 @@ function draw() {
   // Show/hide rotate button
   document.getElementById('btn-rotate').style.display = dragState ? '' : 'none';
 
+  // Blocking mode label follows cursor when dragging interior wall
+  if (dragState && dragState.mod.interior) {
+    const labelX = mouseCanvasX + 16;
+    const labelY = mouseCanvasY - 20;
+
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'left';
+
+    // C line
+    ctx.fillStyle = blockingMode === 'C' ? '#4fc3f7' : '#555';
+    ctx.fillText('C - Continuous', labelX, labelY);
+
+    // T line
+    ctx.fillStyle = blockingMode === 'T' ? '#4fc3f7' : '#555';
+    ctx.fillText('T - Transverse', labelX, labelY + 14);
+  }
+
   updateBOM();
   updatePreview();
 }
@@ -466,10 +533,28 @@ function findSnap(cursorX_mm, cursorY_mm, mod, dir) {
         if (dist < SNAP_DIST_PX * 3 && dist < bestDist) {
           // Check no overlap with existing modules
           if (!wouldOverlap(snapOrigin.x_mm, snapOrigin.y_mm, bb, mod, dir)) {
+            // For interior walls, reject port snaps too close to existing interior walls
+            if (mod.interior && iwallTooCloseToExisting(snapOrigin.x_mm, snapOrigin.y_mm, dir)) {
+              continue;
+            }
             bestDist = dist;
             bestSnap = snapOrigin;
           }
         }
+      }
+    }
+  }
+
+  // Also check T-junction snaps for interior walls
+  if (mod.interior) {
+    const tjSnap = findTJunctionSnap(cursorX_mm, cursorY_mm, mod, dir);
+    if (tjSnap) {
+      const tjBb = getModuleBBox(mod, dir);
+      const tjCx = tjSnap.x_mm + tjBb.w / 2;
+      const tjCy = tjSnap.y_mm + tjBb.h / 2;
+      const tjDist = Math.hypot(mmToPx(tjCx - cursorX_mm), mmToPx(tjCy - cursorY_mm));
+      if (tjDist < bestDist || !bestSnap) {
+        return tjSnap;
       }
     }
   }
@@ -491,6 +576,222 @@ function wouldOverlap(x, y, bb, mod, dir) {
     }
   }
   return false;
+}
+
+// =====================================================
+// T-JUNCTION SNAP (interior walls)
+// =====================================================
+function getInteriorFace(p) {
+  const bb = getModuleBBox(p.mod, p.dir);
+  if (isHorizontal(p.dir)) {
+    if (p.dir === 'north') {
+      return { x1: p.x_mm, y1: p.y_mm + bb.h, x2: p.x_mm + bb.w, y2: p.y_mm + bb.h, axis: 'x' };
+    } else {
+      return { x1: p.x_mm, y1: p.y_mm, x2: p.x_mm + bb.w, y2: p.y_mm, axis: 'x' };
+    }
+  } else {
+    if (p.dir === 'east') {
+      return { x1: p.x_mm, y1: p.y_mm, x2: p.x_mm, y2: p.y_mm + bb.h, axis: 'y' };
+    } else {
+      return { x1: p.x_mm + bb.w, y1: p.y_mm, x2: p.x_mm + bb.w, y2: p.y_mm + bb.h, axis: 'y' };
+    }
+  }
+}
+
+// Get stud center positions along a wall's run in global coords
+function getStudPositionsGlobal(p) {
+  const oc = p.mod.id.includes('16oc') ? 16 : p.mod.id.includes('24oc') ? 24 : 18;
+  const W_in = p.mod.width_mm / IN_TO_MM;
+  const st_in = 1.5; // stud thickness
+  const positions = [0];
+  let cur = oc;
+  while (cur + st_in <= W_in - st_in) { positions.push(cur); cur += oc; }
+  positions.push(W_in - st_in);
+  // Convert to mm and map to global coords along the wall's run
+  const face = getInteriorFace(p);
+  const isH = isHorizontal(p.dir);
+  return positions.map(s_in => {
+    const s_mm = s_in * IN_TO_MM;
+    const center_mm = s_mm + st_in * IN_TO_MM / 2;
+    if (isH) {
+      return { along: p.x_mm + center_mm, cross: face.y1 };
+    } else {
+      return { along: p.y_mm + center_mm, cross: face.x1 };
+    }
+  });
+}
+
+// Get midpoints between adjacent studs (for T mode snapping)
+function getStudMidpointsGlobal(p) {
+  const studs = getStudPositionsGlobal(p);
+  const midpoints = [];
+  for (let i = 0; i < studs.length - 1; i++) {
+    midpoints.push({
+      along: (studs[i].along + studs[i + 1].along) / 2,
+      cross: studs[i].cross,
+    });
+  }
+  return midpoints;
+}
+
+// Determine C1 vs C2 by checking if flanking C2 studs would collide with existing studs
+function getBlockingTypeC(contactAlong, p) {
+  const studs = getStudPositionsGlobal(p);
+  const iwallHalf = 1.5 * IN_TO_MM / 2; // interior wall end stud half-width
+  const bd = 3.5 * IN_TO_MM;             // blocking stud width (3.5")
+  const stHalf = 1.5 * IN_TO_MM / 2;     // existing stud half-width
+
+  // Where C2 left and right studs would go
+  const leftMin = contactAlong - iwallHalf - bd;
+  const leftMax = contactAlong - iwallHalf;
+  const rightMin = contactAlong + iwallHalf;
+  const rightMax = contactAlong + iwallHalf + bd;
+
+  let leftBlocked = false, rightBlocked = false;
+  for (const s of studs) {
+    const sMin = s.along - stHalf;
+    const sMax = s.along + stHalf;
+    if (leftMin < sMax && leftMax > sMin) leftBlocked = true;
+    if (rightMin < sMax && rightMax > sMin) rightBlocked = true;
+  }
+
+  return (leftBlocked || rightBlocked) ? 'C1' : 'C2';
+}
+
+const MIN_IWALL_SPACING_MM = 16 * IN_TO_MM; // 16" minimum between interior walls on same target
+
+// Push contact away from existing interior wall exclusion zones; returns null if no valid spot
+function adjustContactForSpacing(contact, targetId, axis, faceMin, faceMax) {
+  const existing = [];
+  for (const q of placed) {
+    if (!q.connections) continue;
+    for (const c of q.connections) {
+      if (c.target_id !== targetId) continue;
+      existing.push(axis === 'x' ? c.contact_x_mm : c.contact_y_mm);
+    }
+  }
+  if (existing.length === 0) return contact;
+
+  let adjusted = contact;
+  for (const e of existing) {
+    if (Math.abs(adjusted - e) < MIN_IWALL_SPACING_MM) {
+      adjusted = (adjusted >= e) ? e + MIN_IWALL_SPACING_MM : e - MIN_IWALL_SPACING_MM;
+    }
+  }
+  adjusted = Math.max(faceMin, Math.min(faceMax, adjusted));
+  // Verify still valid after clamping
+  for (const e of existing) {
+    if (Math.abs(adjusted - e) < MIN_IWALL_SPACING_MM) return null;
+  }
+  return adjusted;
+}
+
+// Check if a proposed interior wall position is too close to any existing interior wall
+function iwallTooCloseToExisting(x_mm, y_mm, dir) {
+  const isH = isHorizontal(dir);
+  for (const q of placed) {
+    if (!q.mod.interior) continue;
+    if (isHorizontal(q.dir) !== isH) continue; // only check parallel interior walls
+    const dist = isH ? Math.abs(x_mm - q.x_mm) : Math.abs(y_mm - q.y_mm);
+    if (dist < MIN_IWALL_SPACING_MM) return true;
+  }
+  return false;
+}
+
+function findTJunctionSnap(cursorX_mm, cursorY_mm, mod, dir) {
+  if (placed.length === 0) return null;
+  const dragIsH = isHorizontal(dir);
+  const bb = getModuleBBox(mod, dir);
+  let bestDist = Infinity;
+  let bestSnap = null;
+
+  for (const p of placed) {
+    const pIsH = isHorizontal(p.dir);
+    if (dragIsH === pIsH) continue;
+
+    const face = getInteriorFace(p);
+
+    if (face.axis === 'x') {
+      // Target runs horizontal, drag runs vertical
+      const faceY = face.y1;
+      let contactX;
+
+      if (blockingMode === 'T') {
+        // Snap to midpoint between studs
+        const midpoints = getStudMidpointsGlobal(p);
+        let bestMid = null, bestMidDist = Infinity;
+        for (const mp of midpoints) {
+          const d = Math.abs(cursorX_mm - mp.along);
+          if (d < bestMidDist) { bestMidDist = d; bestMid = mp; }
+        }
+        if (!bestMid) continue;
+        contactX = bestMid.along;
+      } else {
+        // C mode: free placement, clamp to face
+        contactX = Math.max(face.x1, Math.min(face.x2, cursorX_mm));
+      }
+
+      if (contactX < face.x1 || contactX > face.x2) continue;
+      contactX = adjustContactForSpacing(contactX, p.id, 'x', face.x1, face.x2);
+      if (contactX === null) continue;
+
+      const snapX = contactX - bb.w / 2;
+      const snapY = (p.dir === 'north') ? faceY : faceY - bb.h;
+
+      const dist = Math.hypot(mmToPx(snapX + bb.w/2 - cursorX_mm), mmToPx(snapY + bb.h/2 - cursorY_mm));
+      if (dist < SNAP_DIST_PX * 4 && dist < bestDist && !wouldOverlap(snapX, snapY, bb, mod, dir)) {
+        bestDist = dist;
+        let blocking;
+        if (blockingMode === 'T') {
+          blocking = 'T';
+        } else {
+          blocking = getBlockingTypeC(contactX, p);
+        }
+        bestSnap = { x_mm: snapX, y_mm: snapY, connection: {
+          target_id: p.id, blocking, contact_x_mm: contactX, contact_y_mm: faceY
+        }};
+      }
+    } else {
+      // Target runs vertical, drag runs horizontal
+      const faceX = face.x1;
+      let contactY;
+
+      if (blockingMode === 'T') {
+        const midpoints = getStudMidpointsGlobal(p);
+        let bestMid = null, bestMidDist = Infinity;
+        for (const mp of midpoints) {
+          const d = Math.abs(cursorY_mm - mp.along);
+          if (d < bestMidDist) { bestMidDist = d; bestMid = mp; }
+        }
+        if (!bestMid) continue;
+        contactY = bestMid.along;
+      } else {
+        contactY = Math.max(face.y1, Math.min(face.y2, cursorY_mm));
+      }
+
+      if (contactY < face.y1 || contactY > face.y2) continue;
+      contactY = adjustContactForSpacing(contactY, p.id, 'y', face.y1, face.y2);
+      if (contactY === null) continue;
+
+      const snapY = contactY - bb.h / 2;
+      const snapX = (p.dir === 'east') ? faceX - bb.w : faceX;
+
+      const dist = Math.hypot(mmToPx(snapX + bb.w/2 - cursorX_mm), mmToPx(snapY + bb.h/2 - cursorY_mm));
+      if (dist < SNAP_DIST_PX * 4 && dist < bestDist && !wouldOverlap(snapX, snapY, bb, mod, dir)) {
+        bestDist = dist;
+        let blocking;
+        if (blockingMode === 'T') {
+          blocking = 'T';
+        } else {
+          blocking = getBlockingTypeC(contactY, p);
+        }
+        bestSnap = { x_mm: snapX, y_mm: snapY, connection: {
+          target_id: p.id, blocking, contact_x_mm: faceX, contact_y_mm: contactY
+        }};
+      }
+    }
+  }
+  return bestSnap;
 }
 
 // =====================================================
@@ -587,7 +888,8 @@ canvas.addEventListener('click', (e) => {
         dir: dragState.dir,
         x_mm: pos.x_mm,
         y_mm: pos.y_mm,
-        id: `wall_${nextId++}`,
+        id: `${dragState.mod.interior ? 'iwall' : 'wall'}_${nextId++}`,
+        connections: pos.connection ? [pos.connection] : [],
       };
       placed.push(mod);
       history.push({ type: 'place', module: mod });
@@ -622,6 +924,8 @@ const HOTKEYS = [
   { key: 'z', ctrl: true,  shift: false, action: undoLast },
   { key: 'z', ctrl: true,  shift: true,  action: redoLast },
   { key: 'r', ctrl: false, shift: false, action: rotateCW },
+  { key: 'c', ctrl: false, shift: false, action: () => { blockingMode = 'C'; draw(); }},
+  { key: 't', ctrl: false, shift: false, action: () => { blockingMode = 'T'; draw(); }},
 ];
 
 document.addEventListener('keydown', (e) => {
@@ -641,36 +945,47 @@ document.addEventListener('keydown', (e) => {
 // =====================================================
 function buildSidebar() {
   const lib = document.getElementById('module-library');
-  MODULES.forEach(mod => {
-    const group = document.createElement('div');
-    group.className = 'module-group';
-    group.innerHTML = `<h3>${mod.label}</h3>`;
-    const grid = document.createElement('div');
-    grid.className = 'module-grid';
 
-    DIRECTIONS.forEach(dir => {
-      const item = document.createElement('div');
-      item.className = 'module-item';
-      item.title = `${mod.label} — ${dir}`;
-      const img = document.createElement('img');
-      img.src = `../icons/${mod.id}_${dir}.svg`;
-      item.appendChild(img);
+  function addModuleSection(title, mods, dirs) {
+    const header = document.createElement('h2');
+    header.textContent = title;
+    lib.appendChild(header);
 
-      item.addEventListener('click', () => {
-        dragState = { mod, dir };
-        snapTarget = null;
-        eraseMode = false;
-        document.getElementById('btn-erase').classList.remove('active');
-        canvas.style.cursor = 'copy';
-        draw();
+    mods.forEach(mod => {
+      const group = document.createElement('div');
+      group.className = 'module-group';
+      group.innerHTML = `<h3>${mod.label}</h3>`;
+      const grid = document.createElement('div');
+      grid.className = 'module-grid';
+
+      dirs.forEach(dir => {
+        const item = document.createElement('div');
+        item.className = 'module-item';
+        item.title = `${mod.label} — ${dir}`;
+        if (mod.interior) item.style.borderColor = '#665';
+        const img = document.createElement('img');
+        img.src = `../icons/${mod.id}_${dir}.svg`;
+        item.appendChild(img);
+
+        item.addEventListener('click', () => {
+          dragState = { mod, dir };
+          snapTarget = null;
+          eraseMode = false;
+          document.getElementById('btn-erase').classList.remove('active');
+          canvas.style.cursor = 'copy';
+          draw();
+        });
+
+        grid.appendChild(item);
       });
 
-      grid.appendChild(item);
+      group.appendChild(grid);
+      lib.appendChild(group);
     });
+  }
 
-    group.appendChild(grid);
-    lib.appendChild(group);
-  });
+  addModuleSection('EXTERIOR', MODULES, DIRECTIONS);
+  addModuleSection('INTERIOR', INTERIOR_MODULES, ['north', 'east']); // H and V only
 }
 
 // =====================================================
@@ -758,6 +1073,7 @@ function exportJSON() {
       y_mm: Math.round(p.y_mm * 100) / 100,
       width_mm: p.mod.width_mm,
       depth_mm: p.mod.depth_mm,
+      ...(p.connections && p.connections.length > 0 ? { connections: p.connections } : {}),
     })),
     metadata: {
       exported: new Date().toISOString(),
@@ -781,6 +1097,7 @@ function saveLayout() {
       direction: p.dir,
       x_mm: Math.round(p.x_mm * 100) / 100,
       y_mm: Math.round(p.y_mm * 100) / 100,
+      ...(p.connections && p.connections.length > 0 ? { connections: p.connections } : {}),
     })),
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -803,7 +1120,7 @@ function loadLayout(event) {
     future.length = 0;
     nextId = 0;
     for (const m of data.modules) {
-      const mod = MODULES.find(mod => mod.id === m.module);
+      const mod = ALL_MODULES.find(mod => mod.id === m.module);
       if (!mod) { console.warn(`Unknown module: ${m.module}`); continue; }
       placed.push({
         mod: mod,
@@ -811,6 +1128,7 @@ function loadLayout(event) {
         x_mm: m.x_mm,
         y_mm: m.y_mm,
         id: m.id || `wall_${nextId}`,
+        connections: m.connections || [],
       });
       nextId++;
     }
@@ -844,7 +1162,7 @@ function updateBOM() {
   }
 
   // Tally materials
-  let totalStuds = 0, totalPlates = 0, totalOSB = 0;
+  let totalStuds2x6 = 0, totalStuds2x4 = 0, totalPlates2x6 = 0, totalPlates2x4 = 0, totalOSB = 0;
   let totalNails = 0, totalScrews = 0;
   let totalCost = 0;
 
@@ -856,16 +1174,25 @@ function updateBOM() {
     const s = specs[modId];
     if (!s) continue;
 
-    totalStuds += s.studs * count;
-    totalPlates += s.plates * count;
+    const is2x4 = s.lumber_type === '2x4';
+    if (is2x4) {
+      totalStuds2x4 += s.studs * count;
+      totalPlates2x4 += s.plates * count;
+    } else {
+      totalStuds2x6 += s.studs * count;
+      totalPlates2x6 += s.plates * count;
+    }
     totalOSB += s.osb_sheets * count;
     totalNails += (s.nails_edge + s.nails_center) * count;
     totalScrews += s.corner_screws * count;
 
     // Cost: studs
-    totalCost += s.studs * count * lumber['2x6_8ft'].unit_price;
+    const studKey = is2x4 ? '2x4_8ft' : '2x6_8ft';
+    totalCost += s.studs * count * lumber[studKey].unit_price;
     // Cost: plates (use closest length)
-    const plateKey = s.plate_length_ft <= 4 ? '2x6_8ft' : '2x6_12ft';
+    const plateKey = is2x4
+      ? (s.plate_length_ft <= 4 ? '2x4_8ft' : '2x4_10ft')
+      : (s.plate_length_ft <= 4 ? '2x6_8ft' : '2x6_12ft');
     totalCost += s.plates * count * lumber[plateKey].unit_price;
     // Cost: OSB
     totalCost += s.osb_sheets * count * lumber['osb_7_16_4x8'].unit_price;
@@ -879,8 +1206,10 @@ function updateBOM() {
     <table style="width:100%; border-collapse:collapse;">
       <tr><td>Modules</td><td style="text-align:right">${placed.length}</td></tr>
       <tr><td colspan="2" style="border-top:1px solid #333; padding-top:4px; color:#667; font-weight:bold;">Lumber</td></tr>
-      <tr><td>2x6 studs</td><td style="text-align:right">${totalStuds}</td></tr>
-      <tr><td>2x6 plates</td><td style="text-align:right">${totalPlates}</td></tr>
+      ${totalStuds2x6 ? `<tr><td>2x6 studs</td><td style="text-align:right">${totalStuds2x6}</td></tr>` : ''}
+      ${totalPlates2x6 ? `<tr><td>2x6 plates</td><td style="text-align:right">${totalPlates2x6}</td></tr>` : ''}
+      ${totalStuds2x4 ? `<tr><td>2x4 studs</td><td style="text-align:right">${totalStuds2x4}</td></tr>` : ''}
+      ${totalPlates2x4 ? `<tr><td>2x4 plates</td><td style="text-align:right">${totalPlates2x4}</td></tr>` : ''}
       <tr><td>OSB sheets</td><td style="text-align:right">${totalOSB}</td></tr>
       <tr><td colspan="2" style="border-top:1px solid #333; padding-top:4px; color:#667; font-weight:bold;">Hardware</td></tr>
       <tr><td>16d nails</td><td style="text-align:right">${totalNails}</td></tr>
@@ -921,6 +1250,7 @@ scene3d.add(dirLight);
 // Materials
 const matLumber = new THREE.MeshLambertMaterial({ color: 0xdaa520 });
 const matOSB = new THREE.MeshLambertMaterial({ color: 0x8fbc8f });
+const matIWallLumber = new THREE.MeshLambertMaterial({ color: 0xc4a882 });
 
 const STUD_THICK = 1.5 * IN_TO_MM;
 const STUD_DEPTH = 5.5 * IN_TO_MM;
@@ -928,16 +1258,18 @@ const OSB_THICK = 0.4375 * IN_TO_MM;
 
 function buildWall3D(mod, dir, xPos, yPos) {
   const group = new THREE.Group();
+  const isInt = mod.interior;
 
   const W = mod.width_mm;  // run length
   const H = (mod.id.includes('8.5') ? 8.5 : 8) * 12 * IN_TO_MM; // wall height
-  const D = STUD_DEPTH;    // stud depth
-  const O = OSB_THICK;
+  const D = isInt ? (3.5 * IN_TO_MM) : STUD_DEPTH;    // stud depth
+  const O = isInt ? 0 : OSB_THICK;
   const PT = STUD_THICK;   // plate thickness
   const ST = STUD_THICK;   // stud thickness
+  const wallMat = isInt ? matIWallLumber : matLumber;
 
   // Compute stud positions along the run
-  const oc = mod.id.includes('16oc') ? 16 : 24;
+  const oc = mod.id.includes('16oc') ? 16 : mod.id.includes('24oc') ? 24 : 18;
   const studPos = [0];
   let cur = oc * IN_TO_MM;
   while (cur + ST <= W - ST) { studPos.push(cur); cur += oc * IN_TO_MM; }
@@ -963,36 +1295,33 @@ function buildWall3D(mod, dir, xPos, yPos) {
 
   if (dir === 'north' || dir === 'south') {
     // Horizontal: run along X (0 to W), depth along Y
-    // North: OSB on far side (+Y), South: OSB on near side (-Y before offset)
-    // Frame centered so bbox top-left at (0,0) matches canvas position
     const osbY = dir === 'south' ? -O / 2 : D + O / 2;
 
     // Bottom plate
-    addBox(W, D, PT, W/2, D/2, PT/2, matLumber);
+    addBox(W, D, PT, W/2, D/2, PT/2, wallMat);
     // Top plate
-    addBox(W, D, PT, W/2, D/2, H - PT/2, matLumber);
+    addBox(W, D, PT, W/2, D/2, H - PT/2, wallMat);
     // Studs
     for (const sx of studPos) {
-      addBox(ST, D, studH, sx + ST/2, D/2, PT + studH/2, matLumber);
+      addBox(ST, D, studH, sx + ST/2, D/2, PT + studH/2, wallMat);
     }
-    // OSB
-    addBox(W, O, H, W/2, osbY, H/2, matOSB);
+    // OSB (skip for interior walls)
+    if (O > 0) addBox(W, O, H, W/2, osbY, H/2, matOSB);
 
   } else {
     // Vertical: run along -Y (canvas Y-down), depth along X
-    // East: OSB on far side (+X), West: OSB on near side (-X)
     const osbX = dir === 'west' ? -O / 2 : D + O / 2;
 
     // Bottom plate
-    addBox(D, W, PT, D/2, -W/2, PT/2, matLumber);
+    addBox(D, W, PT, D/2, -W/2, PT/2, wallMat);
     // Top plate
-    addBox(D, W, PT, D/2, -W/2, H - PT/2, matLumber);
+    addBox(D, W, PT, D/2, -W/2, H - PT/2, wallMat);
     // Studs (run along -Y)
     for (const sy of studPos) {
-      addBox(D, ST, studH, D/2, -(sy + ST/2), PT + studH/2, matLumber);
+      addBox(D, ST, studH, D/2, -(sy + ST/2), PT + studH/2, wallMat);
     }
-    // OSB
-    addBox(O, W, H, osbX, -W/2, H/2, matOSB);
+    // OSB (skip for interior walls)
+    if (O > 0) addBox(O, W, H, osbX, -W/2, H/2, matOSB);
   }
 
   // Position: web UI coords → three.js (flip Y)

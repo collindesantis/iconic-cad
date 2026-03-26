@@ -36,3 +36,37 @@ instances:
       osb_thickness_in: 0.4375
       exterior_face: south
       reference_house_orientation: faces_south
+
+  # Interior walls — no OSB, 2x4 lumber
+  - id: iwall_4x8_2x4_16oc
+    family: interior_wall_panel
+    parameters:
+      nominal_width_ft: 4.0
+      nominal_height_ft: 8.0
+      stud_lumber_nominal: "2x4"
+      stud_spacing_oc_in: 16
+      osb_thickness_in: 0
+      exterior_face: none
+      reference_house_orientation: interior
+
+  - id: iwall_4x8_2x4_24oc
+    family: interior_wall_panel
+    parameters:
+      nominal_width_ft: 4.0
+      nominal_height_ft: 8.0
+      stud_lumber_nominal: "2x4"
+      stud_spacing_oc_in: 24
+      osb_thickness_in: 0
+      exterior_face: none
+      reference_house_orientation: interior
+
+  - id: iwall_3x8.5_2x4_single
+    family: interior_wall_panel
+    parameters:
+      nominal_width_ft: 3.0
+      nominal_height_ft: 8.5
+      stud_lumber_nominal: "2x4"
+      stud_spacing_oc_in: 18
+      osb_thickness_in: 0
+      exterior_face: none
+      reference_house_orientation: interior

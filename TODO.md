@@ -4,8 +4,7 @@
 - [ ] Create door and window module specs *(Marcin)*
 
 ## Todo
-- [ ] 3D preview in browser (three.js)
-- [ ] Interior walls (ladder blocking or continuous blocking options)
+- [x] Interior walls (ladder blocking or continuous blocking options)
 - [ ] Staging/phasing system: walls first, then roof, then plumbing/elec, then interior
 - [ ] Library view toggle: swap between icon view and image preview of actual module
 - [ ] Mobile/tablet support
@@ -26,3 +25,4 @@
 - [x] Rotate tool for cycling module direction during placement
 - [x] Save/load layouts (JSON file)
 - [x] Live BOM estimator (lumber, hardware, cost from pricing.json)
+- [x] 3D preview in browser (three.js)
