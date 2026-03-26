@@ -215,7 +215,10 @@ body { font-family: -apple-system, sans-serif; display: flex; height: 100vh; bac
 <div id="right-sidebar">
   <div class="sidebar-title">// 3D PREVIEW //</div>
   <div id="preview-placeholder">Loading...</div>
-  <div style="flex:1;"></div>
+  <div id="bom-panel" style="margin-top:12px; font-size:11px; color:#aaa; overflow-y:auto; flex:1;">
+    <div style="color:#667; font-weight:bold; letter-spacing:1px; margin-bottom:6px;">// BOM //</div>
+    <div id="bom-content">Place modules to see estimate</div>
+  </div>
   <div style="display:flex; gap:6px; margin-bottom:6px;">
     <button class="btn-save" onclick="saveLayout()">Save</button>
     <button class="btn-load" onclick="document.getElementById('load-input').click()">Load</button>
@@ -419,6 +422,8 @@ function draw() {
 
   // Show/hide rotate button
   document.getElementById('btn-rotate').style.display = dragState ? '' : 'none';
+
+  updateBOM();
 }
 
 // =====================================================
@@ -813,9 +818,81 @@ function loadLayout(event) {
 }
 
 // =====================================================
+// BOM ESTIMATOR
+// =====================================================
+let pricingData = null;
+
+async function loadPricing() {
+  const resp = await fetch('pricing.json');
+  pricingData = await resp.json();
+}
+
+function updateBOM() {
+  const el = document.getElementById('bom-content');
+  if (!pricingData || placed.length === 0) {
+    el.innerHTML = 'Place modules to see estimate';
+    return;
+  }
+
+  // Count modules by type
+  const counts = {};
+  for (const p of placed) {
+    counts[p.mod.id] = (counts[p.mod.id] || 0) + 1;
+  }
+
+  // Tally materials
+  let totalStuds = 0, totalPlates = 0, totalOSB = 0;
+  let totalNails = 0, totalScrews = 0;
+  let totalCost = 0;
+
+  const lumber = pricingData.lumber;
+  const hw = pricingData.hardware;
+  const specs = pricingData.module_specs;
+
+  for (const [modId, count] of Object.entries(counts)) {
+    const s = specs[modId];
+    if (!s) continue;
+
+    totalStuds += s.studs * count;
+    totalPlates += s.plates * count;
+    totalOSB += s.osb_sheets * count;
+    totalNails += (s.nails_edge + s.nails_center) * count;
+    totalScrews += s.corner_screws * count;
+
+    // Cost: studs
+    totalCost += s.studs * count * lumber['2x6_8ft'].unit_price;
+    // Cost: plates (use closest length)
+    const plateKey = s.plate_length_ft <= 4 ? '2x6_8ft' : '2x6_12ft';
+    totalCost += s.plates * count * lumber[plateKey].unit_price;
+    // Cost: OSB
+    totalCost += s.osb_sheets * count * lumber['osb_7_16_4x8'].unit_price;
+    // Cost: nails
+    totalCost += (s.nails_edge + s.nails_center) * count * hw['nail_16d_sinker'].unit_price;
+    // Cost: screws
+    totalCost += s.corner_screws * count * hw['screw_3in'].unit_price;
+  }
+
+  el.innerHTML = `
+    <table style="width:100%; border-collapse:collapse;">
+      <tr><td>Modules</td><td style="text-align:right">${placed.length}</td></tr>
+      <tr><td colspan="2" style="border-top:1px solid #333; padding-top:4px; color:#667; font-weight:bold;">Lumber</td></tr>
+      <tr><td>2x6 studs</td><td style="text-align:right">${totalStuds}</td></tr>
+      <tr><td>2x6 plates</td><td style="text-align:right">${totalPlates}</td></tr>
+      <tr><td>OSB sheets</td><td style="text-align:right">${totalOSB}</td></tr>
+      <tr><td colspan="2" style="border-top:1px solid #333; padding-top:4px; color:#667; font-weight:bold;">Hardware</td></tr>
+      <tr><td>16d nails</td><td style="text-align:right">${totalNails}</td></tr>
+      <tr><td>3" screws</td><td style="text-align:right">${totalScrews}</td></tr>
+      <tr><td colspan="2" style="border-top:1px solid #333; padding-top:6px; color:#4fc3f7; font-weight:bold;">Est. cost</td></tr>
+      <tr><td colspan="2" style="text-align:right; font-size:14px; color:#4fc3f7; font-weight:bold;">$${totalCost.toFixed(2)}</td></tr>
+    </table>
+  `;
+}
+
+// =====================================================
 // INIT
 // =====================================================
 buildSidebar();
+loadPricing();
 resizeCanvas();
 </script>
 </body>

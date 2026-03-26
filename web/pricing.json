@@ -1,0 +1,47 @@
+{
+  "lumber": {
+    "2x6_8ft": { "description": "2x6 x 8' stud", "unit_price": 5.48, "unit": "each" },
+    "2x6_10ft": { "description": "2x6 x 10' plate/stud", "unit_price": 7.18, "unit": "each" },
+    "2x6_12ft": { "description": "2x6 x 12' plate", "unit_price": 9.98, "unit": "each" },
+    "osb_7_16_4x8": { "description": "7/16\" OSB 4x8 sheet", "unit_price": 12.50, "unit": "sheet" }
+  },
+  "hardware": {
+    "nail_16d_sinker": { "description": "16d sinker nail (3-1/4\")", "unit_price": 0.08, "unit": "each" },
+    "screw_3in": { "description": "3\" structural screw", "unit_price": 0.15, "unit": "each" }
+  },
+  "module_specs": {
+    "wall_4x8_2x6_16oc": {
+      "studs": 5,
+      "plates": 2,
+      "osb_sheets": 1,
+      "plate_length_ft": 4,
+      "stud_length_ft": 8,
+      "nails_edge": 26,
+      "nails_center": 18,
+      "corner_screws": 4,
+      "notes": "5 studs (2 end + 3 interior at 16\" OC), 2 plates (top+bottom), 1 OSB sheet. Edge nailing 6\" OC on perimeter studs/plates, center nailing 12\" OC on interior studs."
+    },
+    "wall_4x8_2x6_24oc": {
+      "studs": 4,
+      "plates": 2,
+      "osb_sheets": 1,
+      "plate_length_ft": 4,
+      "stud_length_ft": 8,
+      "nails_edge": 26,
+      "nails_center": 12,
+      "corner_screws": 4,
+      "notes": "4 studs (2 end + 2 interior at 24\" OC), 2 plates, 1 OSB sheet."
+    },
+    "wall_3x8.5_2x6_16oc": {
+      "studs": 4,
+      "plates": 2,
+      "osb_sheets": 1,
+      "plate_length_ft": 3,
+      "stud_length_ft": 8.5,
+      "nails_edge": 22,
+      "nails_center": 12,
+      "corner_screws": 4,
+      "notes": "4 studs (2 end + 2 interior at 16\" OC), 2 plates, 1 OSB sheet (trimmed to 3' width)."
+    }
+  }
+}
