@@ -578,11 +578,22 @@ canvas.addEventListener('contextmenu', (e) => {
   }
 });
 
+// Hotkey definitions: { key, ctrl, shift, action }
+const HOTKEYS = [
+  { key: 'Escape', ctrl: false, shift: false, action: () => { dragState = null; snapTarget = null; eraseMode = false; document.getElementById('btn-erase').classList.remove('active'); canvas.style.cursor = 'crosshair'; draw(); }},
+  { key: 'z', ctrl: true,  shift: false, action: undoLast },
+  { key: 'z', ctrl: true,  shift: true,  action: redoLast },
+];
+
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    dragState = null;
-    snapTarget = null;
-    draw();
+  for (const hk of HOTKEYS) {
+    if (e.key.toLowerCase() === hk.key.toLowerCase() &&
+        !!e.ctrlKey === hk.ctrl &&
+        !!e.shiftKey === hk.shift) {
+      e.preventDefault();
+      hk.action();
+      return;
+    }
   }
 });
 
