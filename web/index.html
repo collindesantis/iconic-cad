@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Iconic CAD — Wall Layout</title>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+}}
+</script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, sans-serif; display: flex; height: 100vh; background: #1a1a2e; color: #eee; }
@@ -98,18 +104,14 @@ body { font-family: -apple-system, sans-serif; display: flex; height: 100vh; bac
   display: flex;
   flex-direction: column;
 }
-#preview-placeholder {
+#preview-container {
   width: 196px;
   height: 196px;
   background: #111828;
   border: 1px solid #333;
   border-radius: 4px;
   margin: 12px 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #555;
-  font-size: 11px;
+  overflow: hidden;
 }
 #right-sidebar .btn-export {
   width: 100%;
@@ -214,7 +216,7 @@ body { font-family: -apple-system, sans-serif; display: flex; height: 100vh; bac
 
 <div id="right-sidebar">
   <div class="sidebar-title">// 3D PREVIEW //</div>
-  <div id="preview-placeholder">Loading...</div>
+  <div id="preview-container"></div>
   <div id="bom-panel" style="margin-top:12px; font-size:11px; color:#aaa; overflow-y:auto; flex:1;">
     <div style="color:#667; font-weight:bold; letter-spacing:1px; margin-bottom:6px;">// BOM //</div>
     <div id="bom-content">Place modules to see estimate</div>
@@ -227,7 +229,7 @@ body { font-family: -apple-system, sans-serif; display: flex; height: 100vh; bac
   <button class="btn-export" onclick="exportJSON()">Export</button>
 </div>
 
-<script>
+<script type="module">
 // =====================================================
 // MODULE DEFINITIONS
 // =====================================================
@@ -424,6 +426,7 @@ function draw() {
   document.getElementById('btn-rotate').style.display = dragState ? '' : 'none';
 
   updateBOM();
+  updatePreview();
 }
 
 // =====================================================
@@ -889,8 +892,178 @@ function updateBOM() {
 }
 
 // =====================================================
+// 3D PREVIEW
+// =====================================================
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const previewContainer = document.getElementById('preview-container');
+const renderer3d = new THREE.WebGLRenderer({ antialias: true });
+renderer3d.setSize(196, 196);
+renderer3d.setClearColor(0x111828);
+previewContainer.appendChild(renderer3d.domElement);
+
+const scene3d = new THREE.Scene();
+const camera3d = new THREE.PerspectiveCamera(45, 1, 1, 100000);
+camera3d.position.set(3000, 3000, 4000);
+camera3d.lookAt(0, 0, 0);
+
+const controls3d = new OrbitControls(camera3d, renderer3d.domElement);
+controls3d.enableDamping = true;
+controls3d.dampingFactor = 0.1;
+
+// Lighting
+scene3d.add(new THREE.AmbientLight(0xffffff, 0.6));
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+dirLight.position.set(2000, 3000, 4000);
+scene3d.add(dirLight);
+
+// Materials
+const matLumber = new THREE.MeshLambertMaterial({ color: 0xdaa520 });
+const matOSB = new THREE.MeshLambertMaterial({ color: 0x8fbc8f });
+
+const STUD_THICK = 1.5 * IN_TO_MM;
+const STUD_DEPTH = 5.5 * IN_TO_MM;
+const OSB_THICK = 0.4375 * IN_TO_MM;
+
+function buildWall3D(mod, dir, xPos, yPos) {
+  const group = new THREE.Group();
+
+  const W = mod.width_mm;  // run length
+  const H = (mod.id.includes('8.5') ? 8.5 : 8) * 12 * IN_TO_MM; // wall height
+  const D = STUD_DEPTH;    // stud depth
+  const O = OSB_THICK;
+  const PT = STUD_THICK;   // plate thickness
+  const ST = STUD_THICK;   // stud thickness
+
+  // Compute stud positions along the run
+  const oc = mod.id.includes('16oc') ? 16 : 24;
+  const studPos = [0];
+  let cur = oc * IN_TO_MM;
+  while (cur + ST <= W - ST) { studPos.push(cur); cur += oc * IN_TO_MM; }
+  studPos.push(W - ST);
+  const studH = H - 2 * PT;
+
+  // Build geometry directly in final orientation.
+  // All walls: Z = height axis (0 to H).
+  // Horizontal walls (N/S): run along X (0 to W), depth along Y.
+  // Vertical walls (E/W): run along Y (0 to W), depth along X.
+  //
+  // OSB position depends on direction:
+  //   North: OSB at max Y (exterior faces +Y / north)
+  //   South: OSB at min Y (exterior faces -Y / south)
+  //   East:  OSB at max X (exterior faces +X / east)
+  //   West:  OSB at min X (exterior faces -X / west)
+
+  function addBox(sx, sy, sz, px, py, pz, mat) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat);
+    m.position.set(px, py, pz);
+    group.add(m);
+  }
+
+  if (dir === 'north' || dir === 'south') {
+    // Horizontal: run along X (0 to W), depth along Y
+    // North: OSB on far side (+Y), South: OSB on near side (-Y before offset)
+    // Frame centered so bbox top-left at (0,0) matches canvas position
+    const osbY = dir === 'south' ? -O / 2 : D + O / 2;
+
+    // Bottom plate
+    addBox(W, D, PT, W/2, D/2, PT/2, matLumber);
+    // Top plate
+    addBox(W, D, PT, W/2, D/2, H - PT/2, matLumber);
+    // Studs
+    for (const sx of studPos) {
+      addBox(ST, D, studH, sx + ST/2, D/2, PT + studH/2, matLumber);
+    }
+    // OSB
+    addBox(W, O, H, W/2, osbY, H/2, matOSB);
+
+  } else {
+    // Vertical: run along -Y (canvas Y-down), depth along X
+    // East: OSB on far side (+X), West: OSB on near side (-X)
+    const osbX = dir === 'west' ? -O / 2 : D + O / 2;
+
+    // Bottom plate
+    addBox(D, W, PT, D/2, -W/2, PT/2, matLumber);
+    // Top plate
+    addBox(D, W, PT, D/2, -W/2, H - PT/2, matLumber);
+    // Studs (run along -Y)
+    for (const sy of studPos) {
+      addBox(D, ST, studH, D/2, -(sy + ST/2), PT + studH/2, matLumber);
+    }
+    // OSB
+    addBox(O, W, H, osbX, -W/2, H/2, matOSB);
+  }
+
+  // Position: web UI coords → three.js (flip Y)
+  // Horizontal walls need Y offset to account for depth direction
+  group.position.x = xPos;
+  if (dir === 'north') {
+    group.position.y = -(yPos + D + O);
+  } else if (dir === 'south') {
+    group.position.y = -(yPos + D);
+  } else {
+    group.position.y = -yPos;
+  }
+
+  return group;
+}
+
+function updatePreview() {
+  // Clear old walls
+  while (scene3d.children.length > 2) { // Keep ambient + dir light
+    scene3d.remove(scene3d.children[scene3d.children.length - 1]);
+  }
+
+  if (placed.length === 0) {
+    renderer3d.render(scene3d, camera3d);
+    return;
+  }
+
+  // Normalize positions
+  const minX = Math.min(...placed.map(p => p.x_mm));
+  const minY = Math.min(...placed.map(p => p.y_mm));
+
+  for (const p of placed) {
+    const wall = buildWall3D(p.mod, p.dir, p.x_mm - minX, p.y_mm - minY);
+    scene3d.add(wall);
+  }
+
+  // Auto-fit camera
+  const sceneBox = new THREE.Box3().setFromObject(scene3d);
+  const sceneCenter = new THREE.Vector3();
+  sceneBox.getCenter(sceneCenter);
+  const size = sceneBox.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+
+  controls3d.target.copy(sceneCenter);
+  camera3d.position.set(sceneCenter.x + maxDim, sceneCenter.y + maxDim, maxDim * 1.2);
+  controls3d.update();
+
+  renderer3d.render(scene3d, camera3d);
+}
+
+// Animation loop for orbit controls
+function animate3d() {
+  requestAnimationFrame(animate3d);
+  controls3d.update();
+  renderer3d.render(scene3d, camera3d);
+}
+animate3d();
+
+// =====================================================
 // INIT
 // =====================================================
+// Expose functions to onclick handlers (module scope isn't global)
+window.clearAll = clearAll;
+window.undoLast = undoLast;
+window.redoLast = redoLast;
+window.toggleErase = toggleErase;
+window.rotateCW = rotateCW;
+window.exportJSON = exportJSON;
+window.saveLayout = saveLayout;
+window.loadLayout = loadLayout;
+
 buildSidebar();
 loadPricing();
 resizeCanvas();
