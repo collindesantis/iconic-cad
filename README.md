@@ -2,6 +2,8 @@
 
 Browser-based drag-and-snap wall layout tool that compiles directly to 3D FreeCAD models. Designed for [Open Source Ecology](http://opensourceecology.org).
 
+**Status:** Exterior walls, interior walls with blocking (continuous/transverse), live 3D preview, BOM estimator, save/load, and JSON-to-FreeCAD compiler are all working. Door and window modules are next.
+
 ## Quick start
 
 ### 1. Clone the repo
@@ -13,13 +15,15 @@ git clone https://github.com/collindesantis/iconic-cad.git
 cd iconic-cad
 ```
 
-### 2. Generate the wall module library (one time)
+### 2. Generate the wall module library
 
 ```bash
 freecadcmd -c "import sys; sys.argv=['generate_wall_library.py','wall_instances.yaml']; exec(open('generate_wall_library.py').read())"
 ```
 
-This creates `cad_library/` with FreeCAD .FCStd files for each wall module type.
+This creates `cad_library/` with FreeCAD .FCStd files for each wall module type (exterior and interior).
+
+> **Note:** Re-run this command after pulling new changes — wall specs may have been added or updated since your last generation.
 
 ### 3. Start the web server
 
@@ -35,6 +39,8 @@ Open http://localhost:8080/web/ in your browser.
 - Click on the canvas to place the first module (free placement)
 - Subsequent modules snap to corner ports on existing walls (blue dots)
 - The darkened border on each icon shows the exterior (OSB) side
+- Interior walls (dashed border) snap perpendicular to exterior walls
+- Press **C** or **T** to switch blocking mode before placing interior walls
 - Right-click or Escape to cancel a placement
 - Click **Export JSON** when done
 
@@ -72,11 +78,13 @@ sudo zypper install freecad python3-PyYAML
 
 ## How it works
 
-1. **Web UI** (`web/index.html`) — drag wall modules onto a canvas. Modules snap to ports at the corners of existing walls, giving direct control over corner geometry.
-2. **Export** — the layout is saved as JSON with exact mm positions for each module.
-3. **JSON compiler** (`compile_from_json.py`) — loads FreeCAD wall shapes, rotates by direction, and places at the positions from the JSON. No run detection or corner math needed — the web UI already handled placement.
+1. **Web UI** (`web/index.html`) — drag wall modules onto a canvas. Exterior walls snap to ports at corners. Interior walls snap perpendicular to exterior walls with automatic blocking detection (C1/C2/T). Live 3D preview and BOM estimator update as you build.
+2. **Export** — the layout is saved as JSON with exact mm positions, directions, and blocking connection data for each module.
+3. **JSON compiler** (`compile_from_json.py`) — loads FreeCAD wall shapes from the CAD library, rotates by direction, places at JSON positions, and generates blocking geometry (continuous studs or ladder blocks) at interior wall T-junctions.
 
 ## Wall modules
+
+### Exterior walls (2x6 + OSB)
 
 | Module | Width | Height | Studs | Spacing |
 |--------|-------|--------|-------|---------|
@@ -84,22 +92,38 @@ sudo zypper install freecad python3-PyYAML
 | wall_4x8_2x6_24oc | 48" (4') | 96" (8') | 2x6 | 24" OC |
 | wall_3x8.5_2x6_16oc | 36" (3') | 102" (8.5') | 2x6 | 16" OC |
 
-All modules: 5.5" stud depth + 7/16" OSB = ~6" total wall depth.
+Exterior wall depth: 5.5" stud + 7/16" OSB = ~6" total.
+
+### Interior walls (2x4, no OSB)
+
+| Module | Width | Height | Studs | Spacing |
+|--------|-------|--------|-------|---------|
+| iwall_4x8_2x4_16oc | 48" (4') | 96" (8') | 2x4 | 16" OC |
+| iwall_4x8_2x4_24oc | 48" (4') | 96" (8') | 2x4 | 24" OC |
+| iwall_3x8.5_2x4_single | 36" (3') | 102" (8.5') | 2x4 | 1 center stud |
+
+Interior wall depth: 3.5" (stud only). Blocking at T-junctions:
+- **C1** — 1 continuous 2x4 stud (when near an existing stud)
+- **C2** — 2 continuous 2x4 studs flanking the interior wall (when in the open)
+- **T** — horizontal ladder blocking between studs
 
 ## Key concepts
 
-- **Directional icons**: darkened border = exterior (OSB) side. N/S/E/W indicates wall facing direction.
-- **Snap-to-port**: modules connect at corner ports. The user controls which corners connect, determining the wall relationship at each joint.
+- **Directional icons**: darkened border = exterior (OSB) side. Dashed border = interior wall (no OSB). N/S/E/W indicates wall facing direction.
+- **Snap-to-port**: exterior modules connect at corner ports. The user controls which corners connect, determining the wall relationship at each joint.
+- **T-junction snap**: interior walls snap perpendicular to exterior wall faces. Press C/T to choose blocking mode. The system auto-detects C1 vs C2 based on stud proximity and enforces 16" minimum spacing between interior walls.
 - **Primary/secondary walls**: at corners, one wall runs through (primary) and the other fits between (secondary). Per OSE spec, N/S walls are primary (roof-bearing).
 
 ## Project structure
 
 ```
-web/index.html           # Browser-based layout tool
-compile_from_json.py     # JSON → FreeCAD compiler
+web/index.html           # Browser-based layout tool (three.js 3D preview, BOM)
+web/pricing.json         # Material specs and unit prices for BOM
+compile_from_json.py     # JSON → FreeCAD compiler (with blocking geometry)
 generate_wall_library.py # Generate wall modules from YAML
-wall_instances.yaml      # Wall module specifications
-icons/                   # 12 directional SVG icons
+wall_instances.yaml      # Wall module specifications (exterior + interior)
+icons/                   # 24 directional SVG icons (exterior + interior)
+cad_library/             # Generated .FCStd wall modules (run generator)
 ```
 
 ## Roadmap
