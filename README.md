@@ -4,12 +4,11 @@ Browser-based drag-and-snap wall layout tool that compiles directly to 3D FreeCA
 
 ## Quick start
 
-### 1. Clone and switch to this branch
+### 1. Clone the repo
 
 ```bash
 git clone https://github.com/collindesantis/iconic-cad.git
 cd iconic-cad
-git checkout web-ui-poc
 ```
 
 ### 2. Generate the wall module library (one time)
