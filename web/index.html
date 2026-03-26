@@ -78,6 +78,15 @@ body { font-family: -apple-system, sans-serif; display: flex; height: 100vh; bac
   border-color: #e53935;
 }
 #toolbar .btn-clear:hover { background: #d32f2f; }
+#toolbar .btn-erase {
+  background: #444;
+  border-color: #555;
+}
+#toolbar .btn-erase:hover { background: #555; }
+#toolbar .btn-erase.active {
+  background: #c62828;
+  border-color: #e53935;
+}
 
 /* Right sidebar */
 #right-sidebar {
@@ -181,6 +190,7 @@ body { font-family: -apple-system, sans-serif; display: flex; height: 100vh; bac
       <button class="btn-clear" onclick="clearAll()">Clear</button>
       <button onclick="undoLast()">&#x21A9; Undo</button>
       <button onclick="redoLast()">Redo &#x21AA;</button>
+      <button id="btn-erase" class="btn-erase" onclick="toggleErase()">&#x2716; Erase</button>
     </div>
     <div id="status">Click and drag modules from the library</div>
   </div>
@@ -252,6 +262,7 @@ function getPortPositions(mod, dir) {
 // =====================================================
 const placed = []; // { mod, dir, x_mm, y_mm, id }
 let dragState = null; // { mod, dir, iconSrc }
+let eraseMode = false;
 let snapTarget = null; // { x_mm, y_mm } or null
 let mouseCanvasX = 0, mouseCanvasY = 0;
 let nextId = 0;
@@ -519,6 +530,17 @@ canvas.addEventListener('mouseup', (e) => {
 });
 
 canvas.addEventListener('click', (e) => {
+  if (eraseMode) {
+    const rect = canvas.getBoundingClientRect();
+    const idx = findModuleAt(e.clientX - rect.left, e.clientY - rect.top);
+    if (idx >= 0) {
+      const mod = placed.splice(idx, 1)[0];
+      history.push({ type: 'erase', module: mod, index: idx });
+      future.length = 0;
+      draw();
+    }
+    return;
+  }
   if (dragState) {
     const rect = canvas.getBoundingClientRect();
     const mx = pxToMm((e.clientX - rect.left) - offsetX);
@@ -531,14 +553,16 @@ canvas.addEventListener('click', (e) => {
       pos = { x_mm: mx - bb.w / 2, y_mm: my - bb.h / 2 };
     }
     if (pos) {
-      placed.push({
+      const mod = {
         mod: dragState.mod,
         dir: dragState.dir,
         x_mm: pos.x_mm,
         y_mm: pos.y_mm,
         id: `wall_${nextId++}`,
-      });
-      redone.length = 0;
+      };
+      placed.push(mod);
+      history.push({ type: 'place', module: mod });
+      future.length = 0;
       snapTarget = null;
       draw();
     }
@@ -585,6 +609,8 @@ function buildSidebar() {
       item.addEventListener('click', () => {
         dragState = { mod, dir };
         snapTarget = null;
+        eraseMode = false;
+        document.getElementById('btn-erase').classList.remove('active');
         canvas.style.cursor = 'copy';
         draw();
       });
@@ -600,11 +626,13 @@ function buildSidebar() {
 // =====================================================
 // TOOLBAR ACTIONS
 // =====================================================
-const redone = [];
+const history = [];  // { type: 'place'|'erase', module, index }
+const future = [];   // redo stack
 
 function clearAll() {
   placed.length = 0;
-  redone.length = 0;
+  history.length = 0;
+  future.length = 0;
   nextId = 0;
   dragState = null;
   snapTarget = null;
@@ -612,17 +640,62 @@ function clearAll() {
 }
 
 function undoLast() {
-  if (placed.length > 0) {
-    redone.push(placed.pop());
-    draw();
+  if (history.length === 0) return;
+  const action = history.pop();
+  if (action.type === 'place') {
+    // Undo a placement — remove the module
+    const idx = placed.indexOf(action.module);
+    if (idx >= 0) placed.splice(idx, 1);
+  } else if (action.type === 'erase') {
+    // Undo an erase — put the module back at its original index
+    placed.splice(action.index, 0, action.module);
   }
+  future.push(action);
+  draw();
 }
 
 function redoLast() {
-  if (redone.length > 0) {
-    placed.push(redone.pop());
-    draw();
+  if (future.length === 0) return;
+  const action = future.pop();
+  if (action.type === 'place') {
+    // Redo a placement — add the module back
+    placed.push(action.module);
+  } else if (action.type === 'erase') {
+    // Redo an erase — remove the module again
+    const idx = placed.indexOf(action.module);
+    if (idx >= 0) placed.splice(idx, 1);
   }
+  history.push(action);
+  draw();
+}
+
+function toggleErase() {
+  eraseMode = !eraseMode;
+  const btn = document.getElementById('btn-erase');
+  btn.classList.toggle('active', eraseMode);
+  if (eraseMode) {
+    dragState = null;
+    snapTarget = null;
+    canvas.style.cursor = 'not-allowed';
+  } else {
+    canvas.style.cursor = 'crosshair';
+  }
+  draw();
+}
+
+function findModuleAt(px_x, px_y) {
+  // Find which placed module the cursor is over (reverse order = top first)
+  const mx = pxToMm(px_x - offsetX);
+  const my = pxToMm(px_y - offsetY);
+  for (let i = placed.length - 1; i >= 0; i--) {
+    const p = placed[i];
+    const bb = getModuleBBox(p.mod, p.dir);
+    if (mx >= p.x_mm && mx <= p.x_mm + bb.w &&
+        my >= p.y_mm && my <= p.y_mm + bb.h) {
+      return i;
+    }
+  }
+  return -1;
 }
 
 function exportJSON() {
