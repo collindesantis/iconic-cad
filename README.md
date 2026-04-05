@@ -1,5 +1,6 @@
-# Iconic CAD — Web UI
+# Iconic CAD - Web UI
 
+Usage video: https://youtu.be/L8IsKB0XknQ
 Browser-based drag-and-snap wall layout tool that compiles directly to 3D FreeCAD models. Designed for [Open Source Ecology](http://opensourceecology.org).
 
 **Status:** Exterior walls, interior walls with blocking (continuous/transverse), live 3D preview, BOM estimator, save/load, and JSON-to-FreeCAD compiler are all working. Door and window modules are next.
@@ -23,7 +24,7 @@ freecadcmd -c "import sys; sys.argv=['generate_wall_library.py','wall_instances.
 
 This creates `cad_library/` with FreeCAD .FCStd files for each wall module type (exterior and interior).
 
-> **Note:** Re-run this command after pulling new changes — wall specs may have been added or updated since your last generation.
+> **Note:** Re-run this command after pulling new changes - wall specs may have been added or updated since your last generation.
 
 ### 3. Start the web server
 
@@ -58,9 +59,9 @@ Open the resulting `.FCStd` file in FreeCAD.
 
 ## Dependencies
 
-- **FreeCAD** (with `freecadcmd` CLI) — generates and compiles wall modules
-- **Python 3** with **PyYAML** — reads wall instance definitions
-- **A web browser** — runs the layout tool (no internet required)
+- **FreeCAD** (with `freecadcmd` CLI) - generates and compiles wall modules
+- **Python 3** with **PyYAML** - reads wall instance definitions
+- **A web browser** - runs the layout tool (no internet required)
 
 ```bash
 # Arch Linux
@@ -78,9 +79,9 @@ sudo zypper install freecad python3-PyYAML
 
 ## How it works
 
-1. **Web UI** (`web/index.html`) — drag wall modules onto a canvas. Exterior walls snap to ports at corners. Interior walls snap perpendicular to exterior walls with automatic blocking detection (C1/C2/T). Live 3D preview and BOM estimator update as you build.
-2. **Export** — the layout is saved as JSON with exact mm positions, directions, and blocking connection data for each module.
-3. **JSON compiler** (`compile_from_json.py`) — loads FreeCAD wall shapes from the CAD library, rotates by direction, places at JSON positions, and generates blocking geometry (continuous studs or ladder blocks) at interior wall T-junctions.
+1. **Web UI** (`web/index.html`) - drag wall modules onto a canvas. Exterior walls snap to ports at corners. Interior walls snap perpendicular to exterior walls with automatic blocking detection (C1/C2/T). Live 3D preview and BOM estimator update as you build.
+2. **Export** - the layout is saved as JSON with exact mm positions, directions, and blocking connection data for each module.
+3. **JSON compiler** (`compile_from_json.py`) - loads FreeCAD wall shapes from the CAD library, rotates by direction, places at JSON positions, and generates blocking geometry (continuous studs or ladder blocks) at interior wall T-junctions.
 
 ## Wall modules
 
@@ -103,9 +104,9 @@ Exterior wall depth: 5.5" stud + 7/16" OSB = ~6" total.
 | iwall_3x8.5_2x4_single | 36" (3') | 102" (8.5') | 2x4 | 1 center stud |
 
 Interior wall depth: 3.5" (stud only). Blocking at T-junctions:
-- **C1** — 1 continuous 2x4 stud (when near an existing stud)
-- **C2** — 2 continuous 2x4 studs flanking the interior wall (when in the open)
-- **T** — horizontal ladder blocking between studs
+- **C1** - 1 continuous 2x4 stud (when near an existing stud)
+- **C2** - 2 continuous 2x4 studs flanking the interior wall (when in the open)
+- **T** - horizontal ladder blocking between studs
 
 ## Key concepts
 
@@ -136,8 +137,8 @@ Previous compiler approaches are archived on the [`legacy`](https://github.com/c
 
 | Compiler | Approach | Limitation |
 |----------|----------|------------|
-| `legacy/compile_house_loop.py` | Marcin's original — clusters icons into N/S/E/W runs, walks sequentially | Rectangular buildings only |
-| `compile_house.py` | Port-based BFS — graph traversal with port markers in CAD files | Corner alignment bug at perpendicular connections |
+| `legacy/compile_house_loop.py` | Marcin's original - clusters icons into N/S/E/W runs, walks sequentially | Rectangular buildings only |
+| `compile_house.py` | Port-based BFS - graph traversal with port markers in CAD files | Corner alignment bug at perpendicular connections |
 | `legacy/grid-placement/compile_house_grid.py` | Grid-based placement on uniform grid | Non-square modules don't fit a grid |
 | `legacy/run-based-compiler/compile_house_runs.py` | Auto-detects wall runs from SVG, connects with dimension math | Complex, fragile at inner corners |
 
@@ -145,4 +146,4 @@ All used the Inkscape/SVG workflow: place icons in Inkscape → parse SVG → as
 
 ## License
 
-Open source — see [OSE licensing](https://www.opensourceecology.org/open-source-hardware-license/).
+Open source - see [OSE licensing](https://www.opensourceecology.org/open-source-hardware-license/).
