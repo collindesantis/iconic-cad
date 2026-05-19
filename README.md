@@ -1,7 +1,10 @@
 # Iconic CAD - Web UI
 
+By Collin DeSantis. Developed in collaboration with [Open Source Ecology](http://opensourceecology.org).
+
 Usage video: https://youtu.be/L8IsKB0XknQ
-Browser-based drag-and-snap wall layout tool that compiles directly to 3D FreeCAD models. Designed for [Open Source Ecology](http://opensourceecology.org).
+
+Browser-based drag-and-snap wall layout tool that compiles directly to 3D FreeCAD models.
 
 **Status:** Exterior walls, interior walls with blocking (continuous/transverse), live 3D preview, BOM estimator, save/load, and JSON-to-FreeCAD compiler are all working. Door and window modules are next.
 
@@ -146,4 +149,6 @@ All used the Inkscape/SVG workflow: place icons in Inkscape → parse SVG → as
 
 ## License
 
-Open source - see [OSE licensing](https://www.opensourceecology.org/open-source-hardware-license/).
+Licensed under the **GNU Affero General Public License v3.0** (AGPL-3.0). See [LICENSE](LICENSE) for the full text.
+
+In short: you may use, modify, and redistribute this software freely. If you run a modified version as a network service, you must make your modified source available to users of that service under the same license. See [AUTHORS.md](AUTHORS.md) for attribution.
