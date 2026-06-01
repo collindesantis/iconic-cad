@@ -679,7 +679,10 @@ function findSnap(cursorX_mm, cursorY_mm, mod, dir) {
     // Interior walls attach to exterior walls only via T-junction (which makes a
     // real connection + blocking) — never by corner port-snap, which would place
     // them flush-but-off-centre with no bolting framing.
-    if (mod.interior && !p.mod.interior) continue;
+    // Interior DOORS (apertures) never port-snap at all: a port-snap to another
+    // interior module lets them stack across an exterior wall onto the outside,
+    // floating with no host wall. They place only via T-junction seam.
+    if (mod.interior && (!p.mod.interior || mod.aperture)) continue;
     const pPorts = getPortPositions(p.mod, p.dir);
     for (const pp of pPorts) {
       const ppAbs = { x: p.x_mm + pp.x, y: p.y_mm + pp.y };
