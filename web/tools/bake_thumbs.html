@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Iconic CAD — Thumbnail Baker</title>
+<!--
+  Build-time tool. Renders every module to a square isometric PNG using the
+  SAME three.js geometry the live 3D view uses (buildWall3D), so library
+  thumbnails match the real output. Run headless:
+
+    chromium --headless=new --enable-unsafe-swiftshader \
+      --virtual-time-budget=8000 --dump-dom \
+      http://localhost:PORT/tools/bake_thumbs.html
+
+  Then decode the JSON in <pre id="out"> to web/thumbs/<id>.png.
+-->
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+}}
+</script>
+</head>
+<body>
+<pre id="out">PENDING</pre>
+<script type="module">
+import * as THREE from 'three';
+import { ALL_MODULES } from '../js/constants.js';
+import { buildWall3D } from '../js/render3d.js';
+
+const SIZE = 256;
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setSize(SIZE, SIZE);
+renderer.setClearAlpha(0);
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+const key = new THREE.DirectionalLight(0xffffff, 0.85); key.position.set(1500, 2500, 3500); scene.add(key);
+const fill = new THREE.DirectionalLight(0xffffff, 0.3); fill.position.set(-2000, -1000, 1500); scene.add(fill);
+
+const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1e6, 1e6);
+camera.up.set(0, 0, 1); // model uses Z as the vertical (height) axis
+
+const result = {};
+for (const mod of ALL_MODULES) {
+  const group = buildWall3D(mod, 'north', 0, 0);
+  scene.add(group);
+
+  const box = new THREE.Box3().setFromObject(group);
+  const center = new THREE.Vector3(); box.getCenter(center);
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z) || 2000;
+
+  const half = maxDim * 0.62;
+  camera.left = -half; camera.right = half; camera.top = half; camera.bottom = -half;
+  camera.updateProjectionMatrix();
+  const dir = new THREE.Vector3(1, 0.85, 0.95).normalize();
+  camera.position.copy(center).add(dir.multiplyScalar(maxDim * 5));
+  camera.lookAt(center);
+
+  renderer.render(scene, camera);
+  result[mod.id] = renderer.domElement.toDataURL('image/png');
+
+  scene.remove(group);
+  group.traverse(o => { if (o.isMesh) o.geometry.dispose(); });
+}
+
+document.getElementById('out').textContent = JSON.stringify(result);
+</script>
+</body>
+</html>

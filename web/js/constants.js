@@ -51,6 +51,9 @@ export const ALL_MODULES = [...MODULES, ...INTERIOR_MODULES, ...APERTURE_MODULES
 export const DIRECTIONS = ['north', 'south', 'east', 'west'];
 export const ROTATE_CW = { north: 'east', east: 'south', south: 'west', west: 'north' };
 
+// NESW selector colours (N red, E yellow, S green, W blue)
+export const DIR_COLORS = { north: '#e53935', east: '#fdd835', south: '#43a047', west: '#4fc3f7' };
+
 // Zoom (PX_PER_MM)
 export const ZOOM_DEFAULT = 0.15; // 4ft wall ≈ 183px
 export const ZOOM_MIN = 0.05;

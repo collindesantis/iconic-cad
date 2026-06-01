@@ -6,7 +6,7 @@
 import { doc, ui, view, history, future } from './state.js';
 import {
   MODULES, INTERIOR_MODULES, APERTURE_MODULES, INT_APERTURE_MODULES,
-  DIRECTIONS, ROTATE_CW, ZOOM_MIN, ZOOM_MAX, ZOOM_STEP,
+  DIRECTIONS, ROTATE_CW, DIR_COLORS, ZOOM_MIN, ZOOM_MAX, ZOOM_STEP,
 } from './constants.js';
 import { getModuleBBox } from './geometry.js';
 import { mmToPx, pxToMm } from './view.js';
@@ -20,21 +20,93 @@ const canvas = document.getElementById('design-canvas');
 // =====================================================
 // SIDEBAR
 // =====================================================
+// Begin placing a module facing `dir`.
+function pickModule(mod, dir) {
+  ui.dragState = { mod, dir };
+  ui.snapTarget = null;
+  ui.eraseMode = false;
+  document.getElementById('btn-erase').classList.remove('active');
+  canvas.style.cursor = 'copy';
+  requestDraw();
+}
+
 function buildSidebar() {
   const lib = document.getElementById('module-library');
+  lib.innerHTML = '';
+  if (ui.libMode === 'iso') buildIsoLibrary(lib);
+  else buildIconLibrary(lib);
+}
 
-  function addModuleSection(title, mods, dirs) {
+// ---- ISO MODE: one baked isometric thumbnail per module; NESW selector sets
+// the placement direction (one image instead of four per module). ------------
+function buildIsoLibrary(lib) {
+  const section = (title, mods) => {
     const header = document.createElement('h2');
     header.textContent = title;
     lib.appendChild(header);
+    const grid = document.createElement('div');
+    grid.className = 'iso-grid';
+    mods.forEach(mod => {
+      const item = document.createElement('div');
+      item.className = 'iso-item' + (mod.interior ? ' interior' : '');
+      item.title = `${mod.label} — places facing ${ui.placeDir}; press R to rotate`;
+      item.innerHTML =
+        `<img src="thumbs/${mod.id}.png" alt="${mod.label}" loading="lazy">` +
+        `<div class="iso-label">${mod.label}</div>`;
+      item.addEventListener('click', () => pickModule(mod, ui.placeDir));
+      grid.appendChild(item);
+    });
+    lib.appendChild(grid);
+  };
+  section('EXTERIOR', MODULES);
+  section('INTERIOR', INTERIOR_MODULES);
+  section('WINDOWS + DOORS', APERTURE_MODULES);
+  section('INTERIOR DOORS', INT_APERTURE_MODULES);
+}
 
+// ---- ICON MODE: Marcin's per-direction SVG icons (4 per module). ------------
+function apertureThumb(mod) {
+  const t = mod.aperture.type;
+  const arc = 'fill="none" stroke="rgba(120,160,200,0.6)" stroke-width="1.2"';
+  const jamb = (x) => `<line x1="${x}" y1="14" x2="${x}" y2="30" stroke="#4fc3f7" stroke-width="1.5"/>`;
+  let body;
+  if (t === 'window') {
+    body = `<line x1="14" y1="20" x2="30" y2="20" stroke="#9fd8ff" stroke-width="1.5"/>
+            <line x1="14" y1="24" x2="30" y2="24" stroke="#9fd8ff" stroke-width="1.5"/>${jamb(14)}${jamb(30)}`;
+  } else if (t === 'double_door') {
+    body = `<line x1="14" y1="30" x2="14" y2="18" stroke="#4fc3f7" stroke-width="1.5"/>
+            <line x1="30" y1="30" x2="30" y2="18" stroke="#4fc3f7" stroke-width="1.5"/>
+            <path d="M14 30 A8 8 0 0 1 22 22" ${arc}/><path d="M30 30 A8 8 0 0 0 22 22" ${arc}/>`;
+  } else if (t === 'sliding') {
+    body = `<line x1="13" y1="21" x2="23" y2="21" stroke="#4fc3f7" stroke-width="2"/>
+            <line x1="21" y1="25" x2="31" y2="25" stroke="#4fc3f7" stroke-width="2"/>`;
+  } else if (t === 'garage') {
+    body = `<line x1="13" y1="19" x2="31" y2="19" stroke="#4fc3f7" stroke-width="1"/>
+            <line x1="13" y1="23" x2="31" y2="23" stroke="#4fc3f7" stroke-width="1"/>
+            <line x1="13" y1="27" x2="31" y2="27" stroke="#4fc3f7" stroke-width="1"/>`;
+  } else {
+    const out = mod.aperture.swing === 'out';
+    body = out
+      ? `${jamb(14)}<path d="M14 14 A16 16 0 0 0 30 30" ${arc}/>`
+      : `${jamb(14)}<path d="M14 30 A16 16 0 0 1 30 14" ${arc}/>`;
+  }
+  const col = mod.interior ? '#bb86fc' : '#4fc3f7';
+  return `<svg width="44" height="44" viewBox="0 0 44 44">
+    <rect x="6" y="14" width="32" height="16" fill="none" stroke="${col}" stroke-width="1.5"
+      ${mod.interior ? 'stroke-dasharray="3,2"' : ''}/>${body}</svg>`;
+}
+
+function buildIconLibrary(lib) {
+  const addModuleSection = (title, mods, dirs) => {
+    const header = document.createElement('h2');
+    header.textContent = title;
+    lib.appendChild(header);
     mods.forEach(mod => {
       const group = document.createElement('div');
       group.className = 'module-group';
       group.innerHTML = `<h3>${mod.label}</h3>`;
       const grid = document.createElement('div');
       grid.className = 'module-grid';
-
       dirs.forEach(dir => {
         const item = document.createElement('div');
         item.className = 'module-item';
@@ -43,56 +115,14 @@ function buildSidebar() {
         const img = document.createElement('img');
         img.src = `../icons/${mod.id}_${dir}.svg`;
         item.appendChild(img);
-
-        item.addEventListener('click', () => {
-          ui.dragState = { mod, dir };
-          ui.snapTarget = null;
-          ui.eraseMode = false;
-          document.getElementById('btn-erase').classList.remove('active');
-          canvas.style.cursor = 'copy';
-          requestDraw();
-        });
-
+        item.addEventListener('click', () => pickModule(mod, dir));
         grid.appendChild(item);
       });
-
       group.appendChild(grid);
       lib.appendChild(group);
     });
-  }
-
-  function apertureThumb(mod) {
-    const t = mod.aperture.type;
-    const arc = 'fill="none" stroke="rgba(120,160,200,0.6)" stroke-width="1.2"';
-    const jamb = (x) => `<line x1="${x}" y1="14" x2="${x}" y2="30" stroke="#4fc3f7" stroke-width="1.5"/>`;
-    let body;
-    if (t === 'window') {
-      body = `<line x1="14" y1="20" x2="30" y2="20" stroke="#9fd8ff" stroke-width="1.5"/>
-              <line x1="14" y1="24" x2="30" y2="24" stroke="#9fd8ff" stroke-width="1.5"/>${jamb(14)}${jamb(30)}`;
-    } else if (t === 'double_door') {
-      body = `<line x1="14" y1="30" x2="14" y2="18" stroke="#4fc3f7" stroke-width="1.5"/>
-              <line x1="30" y1="30" x2="30" y2="18" stroke="#4fc3f7" stroke-width="1.5"/>
-              <path d="M14 30 A8 8 0 0 1 22 22" ${arc}/><path d="M30 30 A8 8 0 0 0 22 22" ${arc}/>`;
-    } else if (t === 'sliding') {
-      body = `<line x1="13" y1="21" x2="23" y2="21" stroke="#4fc3f7" stroke-width="2"/>
-              <line x1="21" y1="25" x2="31" y2="25" stroke="#4fc3f7" stroke-width="2"/>`;
-    } else if (t === 'garage') {
-      body = `<line x1="13" y1="19" x2="31" y2="19" stroke="#4fc3f7" stroke-width="1"/>
-              <line x1="13" y1="23" x2="31" y2="23" stroke="#4fc3f7" stroke-width="1"/>
-              <line x1="13" y1="27" x2="31" y2="27" stroke="#4fc3f7" stroke-width="1"/>`;
-    } else {
-      const out = mod.aperture.swing === 'out';
-      body = out
-        ? `${jamb(14)}<path d="M14 14 A16 16 0 0 0 30 30" ${arc}/>`
-        : `${jamb(14)}<path d="M14 30 A16 16 0 0 1 30 14" ${arc}/>`;
-    }
-    const col = mod.interior ? '#bb86fc' : '#4fc3f7';
-    return `<svg width="44" height="44" viewBox="0 0 44 44">
-      <rect x="6" y="14" width="32" height="16" fill="none" stroke="${col}" stroke-width="1.5"
-        ${mod.interior ? 'stroke-dasharray="3,2"' : ''}/>${body}</svg>`;
-  }
-
-  function addApertureSection(title, mods) {
+  };
+  const addApertureSection = (title, mods) => {
     const header = document.createElement('h2');
     header.textContent = title;
     lib.appendChild(header);
@@ -107,24 +137,62 @@ function buildSidebar() {
       item.title = `${mod.label} — pick, then press R to rotate`;
       if (mod.interior) item.style.borderColor = '#665';
       item.innerHTML = apertureThumb(mod);
-      item.addEventListener('click', () => {
-        ui.dragState = { mod, dir: 'north' };
-        ui.snapTarget = null;
-        ui.eraseMode = false;
-        document.getElementById('btn-erase').classList.remove('active');
-        canvas.style.cursor = 'copy';
-        requestDraw();
-      });
+      item.addEventListener('click', () => pickModule(mod, 'north'));
       grid.appendChild(item);
       group.appendChild(grid);
       lib.appendChild(group);
     });
-  }
-
+  };
   addModuleSection('EXTERIOR', MODULES, DIRECTIONS);
   addModuleSection('INTERIOR', INTERIOR_MODULES, ['north', 'east']);
   addApertureSection('WINDOWS + DOORS', APERTURE_MODULES);
   addApertureSection('INTERIOR DOORS', INT_APERTURE_MODULES);
+}
+
+// ---- Library mode toggle (Iso | Icons) --------------------------------------
+function buildLibMode() {
+  const el = document.getElementById('lib-mode');
+  el.innerHTML = '';
+  for (const [mode, label] of [['iso', 'Iso 3D'], ['icons', 'Icons']]) {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.classList.toggle('active', ui.libMode === mode);
+    b.addEventListener('click', () => {
+      ui.libMode = mode;
+      try { localStorage.setItem('iconic.libMode', mode); } catch (e) { /* ignore */ }
+      buildLibMode();
+      buildSidebar();
+    });
+    el.appendChild(b);
+  }
+}
+
+// ---- NESW direction selector (top-left of grid) -----------------------------
+function buildDirSelector() {
+  const el = document.getElementById('dir-selector');
+  el.innerHTML = '';
+  for (const dir of ['north', 'east', 'south', 'west']) {
+    const b = document.createElement('button');
+    b.textContent = dir[0].toUpperCase();
+    b.title = `Place facing ${dir}`;
+    b.dataset.dir = dir;
+    b.style.background = DIR_COLORS[dir];
+    b.addEventListener('click', () => setPlaceDir(dir));
+    el.appendChild(b);
+  }
+  refreshDirSelector();
+}
+
+function refreshDirSelector() {
+  document.querySelectorAll('#dir-selector button').forEach(b =>
+    b.classList.toggle('active', b.dataset.dir === ui.placeDir));
+}
+
+function setPlaceDir(dir) {
+  ui.placeDir = dir;
+  if (ui.dragState) ui.dragState.dir = dir;
+  refreshDirSelector();
+  requestDraw();
 }
 
 // =====================================================
@@ -183,7 +251,9 @@ function toggleErase() {
 function rotateCW() {
   if (!ui.dragState) return;
   ui.dragState.dir = ROTATE_CW[ui.dragState.dir];
+  ui.placeDir = ui.dragState.dir;   // keep the NESW selector in sync
   ui.snapTarget = null;
+  refreshDirSelector();
   requestDraw();
 }
 
@@ -360,6 +430,9 @@ function wireHotkeys() {
 // INIT
 // =====================================================
 export function initUI() {
+  try { ui.libMode = localStorage.getItem('iconic.libMode') || ui.libMode; } catch (e) { /* ignore */ }
+  buildDirSelector();
+  buildLibMode();
   buildSidebar();
   wireCanvas();
   wireHotkeys();

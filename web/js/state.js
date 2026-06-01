@@ -57,6 +57,8 @@ export const ui = {
   panStartY: 0,
   nextId: 0,
   activeTab: '2d',     // '2d' | '3d'
+  placeDir: 'north',   // direction applied to a module picked in iso-library mode
+  libMode: 'iso',      // 'iso' (one thumbnail + NESW selector) | 'icons' (4 per module)
 };
 
 // ---- Undo / redo ----------------------------------------------------------

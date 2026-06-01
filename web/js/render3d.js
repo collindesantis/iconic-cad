@@ -58,7 +58,7 @@ function addBoxTo(group, sx, sy, sz, px, py, pz, mat) {
   group.add(m);
 }
 
-function buildWall3D(mod, dir, xPos, yPos) {
+export function buildWall3D(mod, dir, xPos, yPos) {
   if (mod.aperture) return buildAperture3D(mod, dir, xPos, yPos);
   const group = new THREE.Group();
   const isInt = mod.interior;
