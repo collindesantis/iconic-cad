@@ -14,5 +14,8 @@ CLAUDE.md
 # Local stash
 icons/stash/
 
+# Exported / test layout JSONs (root only; web/pricing.json stays tracked)
+/*.json
+
 # OS
 .DS_Store

@@ -113,25 +113,44 @@ Interior wall depth: 3.5" (stud only). Blocking at T-junctions:
 
 ### Window + door apertures
 
-| Module | Type | Rough opening | Lumber | Notes |
-|--------|------|---------------|--------|-------|
-| window_4x8_2x6_36x48 | window | 36" × 48", sill 24" | 2x6 + OSB | king/jack/header/cripples + sill |
-| door_4x8_2x6_38x83 | door | 38" × 83" to floor | 2x6 + OSB | header to floor, split bottom plate |
-| idoor_4x8_2x4_38x83 | interior door | 38" × 83" to floor | 2x4 | matches OSE Seh2 interior door |
+| Module | Type | Panel | Rough opening | Lumber |
+|--------|------|-------|---------------|--------|
+| window_4x8_2x6_36x48 | window | 4' × 8' | 36" × 48", sill 24" | 2x6 + OSB |
+| window_4x9_2x6_36x48 | window | 4' × 9' | 36" × 48", sill 24" | 2x6 + OSB |
+| window_4x10_2x6_36x48 | window | 4' × 10' | 36" × 48", sill 24" | 2x6 + OSB |
+| door_4x8_2x6_38x83 | door (in-swing) | 4' × 8' | 38" × 83" to floor | 2x6 + OSB |
+| door_out_4x8_2x6_38x83 | door (out-swing) | 4' × 8' | 38" × 83" to floor | 2x6 + OSB |
+| double_door_8x8_2x6_72x83 | double door | 8' × 8' | 72" × 83" to floor | 2x6 + OSB |
+| sliding_8x8_2x6_72x80 | sliding patio | 8' × 8' | 72" × 80" to floor | 2x6 + OSB |
+| garage_9x8_2x6_96x84 | garage | 9' × 8' | 96" × 84" to floor | 2x6 + OSB |
+| idoor_4x8_2x4_38x83 | interior door | 4' × 8' | 38" × 83" to floor | 2x4 (no OSB) |
 
 A door is a window taken to the floor — one parametric `aperture_wall_panel`
-(see `wall_instances.yaml`). Apertures are 48" wall panels that snap like any
-wall; pick one from the library and press **R** to rotate. Framing dims are
-measured from OSE source CAD — see [docs/aperture_framing_reference.md](docs/aperture_framing_reference.md).
-To add more modules, follow [docs/adding_modules.md](docs/adding_modules.md).
+(see `wall_instances.yaml`). Apertures snap like any wall panel; pick one from
+the library and press **R** to rotate. The opening is cut out of the OSB, the
+plan symbol shows the conventional architectural silhouette (window glazing,
+door leaf + swing arc), and an N/S/E/W letter marks the facing. Windows frame
+king/jack studs, a header, top cripples, a sill, lower cripples, a subheader
+nailer, and horizontal blocking every 24" per the OSE window spec. Framing dims
+are measured from OSE source CAD — see
+[docs/aperture_framing_reference.md](docs/aperture_framing_reference.md). To add
+more modules, follow [docs/adding_modules.md](docs/adding_modules.md).
+
+**Door swing:** in-swing vs out-swing are separate library tiles; the swing arc
+on the canvas shows which way the leaf opens. When you place an interior door at
+a seam, the tool checks its swing arc against every placed door's arc (real
+geometric overlap, computed from the drawn sectors) and refuses positions where
+two leaves would collide — rotate (**R**) to flip the swing to a clear side.
 
 Interior walls may only bolt onto an exterior window/door module at a **seam**
 (a panel edge shared with the adjacent module, where double king studs give a
 real bolting surface) — never across the opening, and only via a centered
-T-junction connection (corner port-snapping interior→exterior is disabled).
-Interior-wall placement keep-outs: ≥48" (one module) between interior walls on
-the same wall, ≥48" from a building corner, and not parallel within ~24" of an
-exterior wall. Plain exterior walls keep the normal mid-panel C1/C2/T blocking.
+T-junction connection. Corner port-snapping interior→exterior is disabled, and
+interior doors place by T-junction only (so they can't float off another
+interior module). Interior-wall placement keep-outs: ≥48" (one module) between
+interior walls on the same wall, ≥48" from a building corner, and not parallel
+within ~24" of an exterior wall. Plain exterior walls keep the normal mid-panel
+C1/C2/T blocking.
 
 ## Key concepts
 
