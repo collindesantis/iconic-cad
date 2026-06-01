@@ -399,9 +399,10 @@ function drawAperturePlan(p, px, py, pw, ph) {
   const intCross = extAtZero ? crossLen : 0;     // interior face position
   const extCross = extAtZero ? 0 : crossLen;
 
-  // Which cross-face the door swings toward: interior by default, exterior if
-  // the module is flagged swing:'out'.
-  const swingCross = (a.swing === 'out') ? extCross : intCross;
+  // Which cross-face the door swings toward.
+  // 'in'  → hinge at exterior face, arc sweeps into the room (interior side).
+  // 'out' → hinge at interior face, arc sweeps to the outside (exterior side).
+  const swingCross = (a.swing === 'out') ? intCross : extCross;
   const leafColor = p.mod.interior ? '#bb86fc' : '#4fc3f7';
 
   ctx.save();
@@ -870,6 +871,93 @@ function interiorContactTooClose(contactX, contactY, faceAxis) {
 }
 
 
+// ---- Door swing collision (geometric, not heuristic) -------------------------
+// The previous version hardcoded edge/direction rules and was wrong. This one
+// reconstructs each door leaf's swept quarter-disc in GLOBAL mm using the exact
+// same geometry drawAperturePlan() renders, then tests for sector overlap — so
+// the block decision always matches what the user sees on the canvas.
+
+// Swept leaf(s) of an aperture as circular sectors {cx, cy, r, a0, a1} in mm.
+// door → 1 leaf, double_door → 2; window/sliding/garage → [] (no swing).
+function doorSwingSectors(mod, dir, x_mm, y_mm) {
+  const a = mod.aperture;
+  if (!a || (a.type !== 'door' && a.type !== 'double_door')) return [];
+  const horiz = isHorizontal(dir);
+  const bb = getModuleBBox(mod, dir);
+  const roW = a.ro_w_in * IN_TO_MM;
+  const runLen = horiz ? bb.w : bb.h;
+  const crossLen = horiz ? bb.h : bb.w;
+  const a0 = (runLen - roW) / 2, a1 = a0 + roW;
+  const T = (along, cross) => horiz
+    ? { x: x_mm + along, y: y_mm + cross }
+    : { x: x_mm + cross, y: y_mm + along };
+  const extAtZero = (dir === 'north' || dir === 'west');
+  const intCross = extAtZero ? crossLen : 0;
+  const extCross = extAtZero ? 0 : crossLen;
+  const swingCross = (a.swing === 'out') ? intCross : extCross;
+  const sign = swingCross === 0 ? 1 : -1;
+  const sector = (hingeAlong, openAlong, radius) => {
+    const hinge = T(hingeAlong, swingCross);
+    const leafEnd = T(hingeAlong, swingCross + sign * radius);
+    const open = T(openAlong, swingCross);
+    return {
+      cx: hinge.x, cy: hinge.y, r: radius,
+      a0: Math.atan2(leafEnd.y - hinge.y, leafEnd.x - hinge.x),
+      a1: Math.atan2(open.y - hinge.y, open.x - hinge.x),
+    };
+  };
+  if (a.type === 'double_door') {
+    const mid = (a0 + a1) / 2;
+    return [sector(a0, mid, roW / 2), sector(a1, mid, roW / 2)];
+  }
+  return [sector(a0, a1, roW)];
+}
+
+// Point inside sector? within radius AND within the short (<=180°) sweep a0→a1.
+function pointInSector(px, py, s) {
+  const dx = px - s.cx, dy = py - s.cy;
+  if (dx * dx + dy * dy > s.r * s.r) return false;
+  let span = s.a1 - s.a0;
+  while (span <= -Math.PI) span += 2 * Math.PI;
+  while (span > Math.PI) span -= 2 * Math.PI;     // signed short sweep
+  let t = Math.atan2(dy, dx) - s.a0;
+  while (t <= -Math.PI) t += 2 * Math.PI;
+  while (t > Math.PI) t -= 2 * Math.PI;
+  return span >= 0 ? (t >= 0 && t <= span) : (t <= 0 && t >= span);
+}
+
+// Do two swept sectors overlap? Sample a fan of points across each filled
+// sector and test membership in the other (catches partial overlap + containment).
+function sectorsOverlap(s1, s2) {
+  const RS = [0.2, 0.4, 0.6, 0.8, 1.0], NA = 8;
+  const hits = (a, b) => {
+    let span = a.a1 - a.a0;
+    while (span <= -Math.PI) span += 2 * Math.PI;
+    while (span > Math.PI) span -= 2 * Math.PI;
+    for (const rf of RS)
+      for (let i = 0; i <= NA; i++) {
+        const ang = a.a0 + span * (i / NA);
+        if (pointInSector(a.cx + a.r * rf * Math.cos(ang),
+                          a.cy + a.r * rf * Math.sin(ang), b)) return true;
+      }
+    return false;
+  };
+  return hits(s1, s2) || hits(s2, s1);
+}
+
+// Would the dragging aperture at (x_mm,y_mm) swing into any placed door's swing?
+function apertureSwingConflicts(mod, dir, x_mm, y_mm) {
+  const mine = doorSwingSectors(mod, dir, x_mm, y_mm);
+  if (!mine.length) return false;
+  for (const q of placed) {
+    const theirs = doorSwingSectors(q.mod, q.dir, q.x_mm, q.y_mm);
+    for (const s1 of mine)
+      for (const s2 of theirs)
+        if (sectorsOverlap(s1, s2)) return true;
+  }
+  return false;
+}
+
 // Check if a proposed interior wall position is too close to any existing interior wall
 function iwallTooCloseToExisting(x_mm, y_mm, dir) {
   const isH = isHorizontal(dir);
@@ -981,6 +1069,7 @@ function findTJunctionSnap(cursorX_mm, cursorY_mm, mod, dir) {
 
       const snapX = contactX - bb.w / 2;
       const snapY = (p.dir === 'north') ? faceY : faceY - bb.h;
+      if (apertureSwingConflicts(mod, dir, snapX, snapY)) continue; // door swing would hit a placed door
 
       const dist = Math.hypot(mmToPx(snapX + bb.w/2 - cursorX_mm), mmToPx(snapY + bb.h/2 - cursorY_mm));
       if (dist < SNAP_DIST_PX * 4 && dist < bestDist && !wouldOverlap(snapX, snapY, bb, mod, dir)) {
@@ -1022,6 +1111,7 @@ function findTJunctionSnap(cursorX_mm, cursorY_mm, mod, dir) {
 
       const snapY = contactY - bb.h / 2;
       const snapX = (p.dir === 'east') ? faceX - bb.w : faceX;
+      if (apertureSwingConflicts(mod, dir, snapX, snapY)) continue; // door swing would hit a placed door
 
       const dist = Math.hypot(mmToPx(snapX + bb.w/2 - cursorX_mm), mmToPx(snapY + bb.h/2 - cursorY_mm));
       if (dist < SNAP_DIST_PX * 4 && dist < bestDist && !wouldOverlap(snapX, snapY, bb, mod, dir)) {
