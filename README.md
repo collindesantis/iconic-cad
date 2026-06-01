@@ -125,6 +125,14 @@ wall; pick one from the library and press **R** to rotate. Framing dims are
 measured from OSE source CAD — see [docs/aperture_framing_reference.md](docs/aperture_framing_reference.md).
 To add more modules, follow [docs/adding_modules.md](docs/adding_modules.md).
 
+Interior walls may only bolt onto an exterior window/door module at a **seam**
+(a panel edge shared with the adjacent module, where double king studs give a
+real bolting surface) — never across the opening, and only via a centered
+T-junction connection (corner port-snapping interior→exterior is disabled).
+Interior-wall placement keep-outs: ≥48" (one module) between interior walls on
+the same wall, ≥48" from a building corner, and not parallel within ~24" of an
+exterior wall. Plain exterior walls keep the normal mid-panel C1/C2/T blocking.
+
 ## Key concepts
 
 - **Directional icons**: darkened border = exterior (OSB) side. Dashed border = interior wall (no OSB). N/S/E/W indicates wall facing direction.

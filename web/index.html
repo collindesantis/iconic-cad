@@ -624,6 +624,10 @@ function findSnap(cursorX_mm, cursorY_mm, mod, dir) {
 
   // Check each placed module's ports against drag module's ports
   for (const p of placed) {
+    // Interior walls attach to exterior walls only via T-junction (which makes a
+    // real connection + blocking) — never by corner port-snap, which would place
+    // them flush-but-off-centre with no bolting framing.
+    if (mod.interior && !p.mod.interior) continue;
     const pPorts = getPortPositions(p.mod, p.dir);
     for (const pp of pPorts) {
       const ppAbs = { x: p.x_mm + pp.x, y: p.y_mm + pp.y };
@@ -642,8 +646,11 @@ function findSnap(cursorX_mm, cursorY_mm, mod, dir) {
         if (dist < SNAP_DIST_PX * 3 && dist < bestDist) {
           // Check no overlap with existing modules
           if (!wouldOverlap(snapOrigin.x_mm, snapOrigin.y_mm, bb, mod, dir)) {
-            // For interior walls, reject port snaps too close to existing interior walls
-            if (mod.interior && iwallTooCloseToExisting(snapOrigin.x_mm, snapOrigin.y_mm, dir)) {
+            // For interior walls, reject port snaps too close to existing interior
+            // walls, or running parallel and very close to an exterior wall.
+            if (mod.interior &&
+                (iwallTooCloseToExisting(snapOrigin.x_mm, snapOrigin.y_mm, dir) ||
+                 iwallTooCloseToExteriorParallel(snapOrigin.x_mm, snapOrigin.y_mm, mod, dir))) {
               continue;
             }
             bestDist = dist;
@@ -767,7 +774,29 @@ function getBlockingTypeC(contactAlong, p) {
   return (leftBlocked || rightBlocked) ? 'C1' : 'C2';
 }
 
-const MIN_IWALL_SPACING_MM = 16 * IN_TO_MM; // 16" minimum between interior walls on same target
+const MIN_IWALL_SPACING_MM = 48 * IN_TO_MM; // one module: min between interior walls on same target
+const CORNER_KEEPOUT_MM = 48 * IN_TO_MM;    // one module: keep interior-wall contacts away from corners
+
+// A "corner" is where a perpendicular exterior wall meets this run (a building
+// corner). Interior walls must keep one module clear of it. Returns true if the
+// contact (along-axis global position) is within the keep-out of any corner.
+function nearACorner(p, contactAlong) {
+  const pIsH = isHorizontal(p.dir);
+  const pbb = getModuleBBox(p.mod, p.dir);
+  for (const q of placed) {
+    if (q === p || q.mod.interior) continue;
+    if (isHorizontal(q.dir) === pIsH) continue; // perpendicular walls only
+    const qbb = getModuleBBox(q.mod, q.dir);
+    if (pIsH) {
+      if (q.y_mm > p.y_mm + pbb.h + 5 || q.y_mm + qbb.h < p.y_mm - 5) continue; // q must reach p's line
+      if (Math.abs(contactAlong - (q.x_mm + qbb.w / 2)) < CORNER_KEEPOUT_MM) return true;
+    } else {
+      if (q.x_mm > p.x_mm + pbb.w + 5 || q.x_mm + qbb.w < p.x_mm - 5) continue;
+      if (Math.abs(contactAlong - (q.y_mm + qbb.h / 2)) < CORNER_KEEPOUT_MM) return true;
+    }
+  }
+  return false;
+}
 
 // Push contact away from existing interior wall exclusion zones; returns null if no valid spot
 function adjustContactForSpacing(contact, targetId, axis, faceMin, faceMax) {
@@ -807,6 +836,62 @@ function iwallTooCloseToExisting(x_mm, y_mm, dir) {
   return false;
 }
 
+// Interior walls may not run parallel to and very close to an exterior wall —
+// there's no useful place to bolt and it crowds the framing. Keep-out ~24".
+const MIN_IWALL_TO_EXT_PARALLEL_MM = 24 * IN_TO_MM;
+function iwallTooCloseToExteriorParallel(x_mm, y_mm, mod, dir) {
+  const isH = isHorizontal(dir);
+  const bb = getModuleBBox(mod, dir);
+  const aStart = isH ? x_mm : y_mm, aEnd = aStart + (isH ? bb.w : bb.h);
+  for (const q of placed) {
+    if (q.mod.interior) continue;               // exterior walls only
+    if (isHorizontal(q.dir) !== isH) continue;  // parallel runs only
+    const qbb = getModuleBBox(q.mod, q.dir);
+    const dist = isH ? Math.abs(y_mm - q.y_mm) : Math.abs(x_mm - q.x_mm);
+    if (dist >= MIN_IWALL_TO_EXT_PARALLEL_MM) continue;
+    const qStart = isH ? q.x_mm : q.y_mm, qEnd = qStart + (isH ? qbb.w : qbb.h);
+    if (Math.min(aEnd, qEnd) - Math.max(aStart, qStart) > 0) return true; // spans overlap
+  }
+  return false;
+}
+
+// Valid bolt points on an exterior aperture (window/door) module: only the
+// panel edges that are shared with an adjacent exterior module — i.e. the seam
+// between two modules, where double king studs give a real bolting surface.
+// Never the opening. Returns along-axis positions (global) of valid seams.
+function apertureSeamContacts(p) {
+  if (!p.mod.aperture) return [];
+  const isH = isHorizontal(p.dir);
+  const W = p.mod.width_mm;
+  const edges = isH ? [p.x_mm, p.x_mm + W] : [p.y_mm, p.y_mm + W];
+  const faceLine = isH ? p.y_mm : p.x_mm;
+  const TOL = 2;
+  const valid = [];
+  for (const edge of edges) {
+    for (const q of placed) {
+      if (q === p || q.mod.interior) continue;
+      if (isHorizontal(q.dir) !== isH) continue;           // same run orientation
+      const qLine = isH ? q.y_mm : q.x_mm;
+      if (Math.abs(qLine - faceLine) > p.mod.depth_mm) continue; // same wall line
+      const qStart = isH ? q.x_mm : q.y_mm, qEnd = qStart + q.mod.width_mm;
+      if (Math.abs(qStart - edge) < TOL || Math.abs(qEnd - edge) < TOL) {
+        valid.push(edge);
+        break;
+      }
+    }
+  }
+  return valid;
+}
+
+function nearestApertureSeam(p, cursorAlong) {
+  let best = null, bd = Infinity;
+  for (const s of apertureSeamContacts(p)) {
+    const d = Math.abs(cursorAlong - s);
+    if (d < bd) { bd = d; best = s; }
+  }
+  return best;
+}
+
 function findTJunctionSnap(cursorX_mm, cursorY_mm, mod, dir) {
   if (placed.length === 0) return null;
   const dragIsH = isHorizontal(dir);
@@ -825,7 +910,11 @@ function findTJunctionSnap(cursorX_mm, cursorY_mm, mod, dir) {
       const faceY = face.y1;
       let contactX;
 
-      if (blockingMode === 'T') {
+      if (p.mod.aperture) {
+        // Aperture: only the seam between two modules; no opening, no T mode.
+        contactX = nearestApertureSeam(p, cursorX_mm);
+        if (contactX === null) continue;
+      } else if (blockingMode === 'T') {
         // Snap to midpoint between studs
         const midpoints = getStudMidpointsGlobal(p);
         let bestMid = null, bestMidDist = Infinity;
@@ -841,8 +930,11 @@ function findTJunctionSnap(cursorX_mm, cursorY_mm, mod, dir) {
       }
 
       if (contactX < face.x1 || contactX > face.x2) continue;
-      contactX = adjustContactForSpacing(contactX, p.id, 'x', face.x1, face.x2);
-      if (contactX === null) continue;
+      if (!p.mod.aperture) {
+        contactX = adjustContactForSpacing(contactX, p.id, 'x', face.x1, face.x2);
+        if (contactX === null) continue;
+      }
+      if (nearACorner(p, contactX)) continue; // keep one module clear of corners
 
       const snapX = contactX - bb.w / 2;
       const snapY = (p.dir === 'north') ? faceY : faceY - bb.h;
@@ -851,7 +943,7 @@ function findTJunctionSnap(cursorX_mm, cursorY_mm, mod, dir) {
       if (dist < SNAP_DIST_PX * 4 && dist < bestDist && !wouldOverlap(snapX, snapY, bb, mod, dir)) {
         bestDist = dist;
         let blocking;
-        if (blockingMode === 'T') {
+        if (blockingMode === 'T' && !p.mod.aperture) {
           blocking = 'T';
         } else {
           blocking = getBlockingTypeC(contactX, p);
@@ -865,7 +957,10 @@ function findTJunctionSnap(cursorX_mm, cursorY_mm, mod, dir) {
       const faceX = face.x1;
       let contactY;
 
-      if (blockingMode === 'T') {
+      if (p.mod.aperture) {
+        contactY = nearestApertureSeam(p, cursorY_mm);
+        if (contactY === null) continue;
+      } else if (blockingMode === 'T') {
         const midpoints = getStudMidpointsGlobal(p);
         let bestMid = null, bestMidDist = Infinity;
         for (const mp of midpoints) {
@@ -879,8 +974,11 @@ function findTJunctionSnap(cursorX_mm, cursorY_mm, mod, dir) {
       }
 
       if (contactY < face.y1 || contactY > face.y2) continue;
-      contactY = adjustContactForSpacing(contactY, p.id, 'y', face.y1, face.y2);
-      if (contactY === null) continue;
+      if (!p.mod.aperture) {
+        contactY = adjustContactForSpacing(contactY, p.id, 'y', face.y1, face.y2);
+        if (contactY === null) continue;
+      }
+      if (nearACorner(p, contactY)) continue; // keep one module clear of corners
 
       const snapY = contactY - bb.h / 2;
       const snapX = (p.dir === 'east') ? faceX - bb.w : faceX;
@@ -889,7 +987,7 @@ function findTJunctionSnap(cursorX_mm, cursorY_mm, mod, dir) {
       if (dist < SNAP_DIST_PX * 4 && dist < bestDist && !wouldOverlap(snapX, snapY, bb, mod, dir)) {
         bestDist = dist;
         let blocking;
-        if (blockingMode === 'T') {
+        if (blockingMode === 'T' && !p.mod.aperture) {
           blocking = 'T';
         } else {
           blocking = getBlockingTypeC(contactY, p);
