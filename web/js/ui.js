@@ -14,6 +14,7 @@ import { findSnap } from './snap.js';
 import { markModelChanged, requestDraw } from './app.js';
 import { setViewport, resize3d } from './render3d.js';
 import { exportJSON, saveLayout, loadLayout } from './io.js';
+import { exportFcstd } from './fcstd.js';
 
 const canvas = document.getElementById('design-canvas');
 
@@ -447,6 +448,7 @@ export function initUI() {
   // Right sidebar
   document.getElementById('btn-save').addEventListener('click', saveLayout);
   document.getElementById('btn-export').addEventListener('click', exportJSON);
+  document.getElementById('btn-export-fcstd').addEventListener('click', exportFcstd);
   document.getElementById('btn-load').addEventListener('click',
     () => document.getElementById('load-input').click());
   document.getElementById('load-input').addEventListener('change', loadLayout);
