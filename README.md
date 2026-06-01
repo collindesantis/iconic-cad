@@ -6,7 +6,7 @@ Usage video: https://youtu.be/L8IsKB0XknQ
 
 Browser-based drag-and-snap wall layout tool that compiles directly to 3D FreeCAD models.
 
-**Status:** Exterior walls, interior walls with blocking (continuous/transverse), live 3D preview, BOM estimator, save/load, and JSON-to-FreeCAD compiler are all working. Door and window modules are next.
+**Status:** Exterior walls, interior walls with blocking (continuous/transverse), window and door aperture modules, live 3D preview, BOM estimator, save/load, and JSON-to-FreeCAD compiler are all working.
 
 ## Quick start
 
@@ -111,6 +111,20 @@ Interior wall depth: 3.5" (stud only). Blocking at T-junctions:
 - **C2** - 2 continuous 2x4 studs flanking the interior wall (when in the open)
 - **T** - horizontal ladder blocking between studs
 
+### Window + door apertures
+
+| Module | Type | Rough opening | Lumber | Notes |
+|--------|------|---------------|--------|-------|
+| window_4x8_2x6_36x48 | window | 36" × 48", sill 24" | 2x6 + OSB | king/jack/header/cripples + sill |
+| door_4x8_2x6_38x83 | door | 38" × 83" to floor | 2x6 + OSB | header to floor, split bottom plate |
+| idoor_4x8_2x4_38x83 | interior door | 38" × 83" to floor | 2x4 | matches OSE Seh2 interior door |
+
+A door is a window taken to the floor — one parametric `aperture_wall_panel`
+(see `wall_instances.yaml`). Apertures are 48" wall panels that snap like any
+wall; pick one from the library and press **R** to rotate. Framing dims are
+measured from OSE source CAD — see [docs/aperture_framing_reference.md](docs/aperture_framing_reference.md).
+To add more modules, follow [docs/adding_modules.md](docs/adding_modules.md).
+
 ## Key concepts
 
 - **Directional icons**: darkened border = exterior (OSB) side. Dashed border = interior wall (no OSB). N/S/E/W indicates wall facing direction.
@@ -125,9 +139,10 @@ web/index.html           # Browser-based layout tool (three.js 3D preview, BOM)
 web/pricing.json         # Material specs and unit prices for BOM
 compile_from_json.py     # JSON → FreeCAD compiler (with blocking geometry)
 generate_wall_library.py # Generate wall modules from YAML
-wall_instances.yaml      # Wall module specifications (exterior + interior)
-icons/                   # 24 directional SVG icons (exterior + interior)
-cad_library/             # Generated .FCStd wall modules (run generator)
+wall_instances.yaml      # Module specifications (walls, interior walls, apertures)
+icons/                   # 24 directional SVG icons (exterior + interior walls)
+cad_library/             # Generated .FCStd modules (run generator)
+docs/                    # Module-authoring guide + aperture framing reference
 ```
 
 ## Roadmap

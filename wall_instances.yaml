@@ -70,3 +70,69 @@ instances:
       osb_thickness_in: 0
       exterior_face: none
       reference_house_orientation: interior
+
+  # =====================================================================
+  # Aperture wall panels — windows and doors.
+  # A door is a window taken to the floor: same header / king-stud / jack-stud
+  # logic; the window adds a sill and lower cripples. One parametric object.
+  # The `aperture` block drives the opening framing. Framing dims are measured
+  # from OSE source CAD — see docs/aperture_framing_reference.md.
+  # Panels are 48" wide and snap exactly like a plain wall module.
+  # =====================================================================
+
+  # Exterior window — 2x6 + OSB, 36"x48" rough opening, sill at 24".
+  - id: window_4x8_2x6_36x48_south
+    family: aperture_wall_panel
+    parameters:
+      nominal_width_ft: 4.0
+      nominal_height_ft: 8.0
+      stud_lumber_nominal: "2x6"
+      stud_spacing_oc_in: 16
+      osb_thickness_in: 0.4375
+      exterior_face: south
+      reference_house_orientation: faces_south
+      aperture:
+        type: window
+        rough_opening_width_in: 36
+        rough_opening_height_in: 48
+        sill_height_in: 24            # height to top of sill (>= 24" per OSE)
+        header_lumber_nominal: "2x8"  # doubled 2x8 ample for <=4' span (IRC)
+        header_plies: 2
+
+  # Exterior door — 2x6 + OSB, 38"x83" rough opening, opening to the floor.
+  - id: door_4x8_2x6_38x83_south
+    family: aperture_wall_panel
+    parameters:
+      nominal_width_ft: 4.0
+      nominal_height_ft: 8.0
+      stud_lumber_nominal: "2x6"
+      stud_spacing_oc_in: 16
+      osb_thickness_in: 0.4375
+      exterior_face: south
+      reference_house_orientation: faces_south
+      aperture:
+        type: door
+        rough_opening_width_in: 38
+        rough_opening_height_in: 83
+        sill_height_in: 0             # door: opening goes to the floor
+        header_lumber_nominal: "2x8"
+        header_plies: 2
+
+  # Interior door — 2x4, 38"x83" rough opening (matches Seh2 8ft interior door).
+  - id: idoor_4x8_2x4_38x83
+    family: aperture_wall_panel
+    parameters:
+      nominal_width_ft: 4.0
+      nominal_height_ft: 8.0
+      stud_lumber_nominal: "2x4"
+      stud_spacing_oc_in: 16
+      osb_thickness_in: 0
+      exterior_face: none
+      reference_house_orientation: interior
+      aperture:
+        type: door
+        rough_opening_width_in: 38
+        rough_opening_height_in: 83
+        sill_height_in: 0
+        header_lumber_nominal: "2x4"  # interior, non-bearing
+        header_plies: 1

@@ -254,7 +254,23 @@ const INTERIOR_MODULES = [
   { id: 'iwall_3x8.5_2x4_single', label: '3x8.5 1S', width_mm: 3 * 12 * IN_TO_MM, depth_mm: IWALL_DEPTH, interior: true },
 ];
 
-const ALL_MODULES = [...MODULES, ...INTERIOR_MODULES];
+// Aperture modules (windows + doors). A door is a window taken to the floor:
+// the `aperture` block (inches) drives the plan silhouette, 3D framing, and BOM.
+// Sill_in = 0 means the opening runs to the floor (door). These snap exactly
+// like a plain 48" wall panel. See docs/aperture_framing_reference.md.
+const APERTURE_MODULES = [
+  { id: 'window_4x8_2x6_36x48', label: 'Window 36x48', width_mm: 4 * 12 * IN_TO_MM, depth_mm: WALL_DEPTH,
+    aperture: { type: 'window', ro_w_in: 36, ro_h_in: 48, sill_in: 24, oc: 16, header_nominal: '2x8', header_plies: 2 } },
+  { id: 'door_4x8_2x6_38x83', label: 'Door 38x83', width_mm: 4 * 12 * IN_TO_MM, depth_mm: WALL_DEPTH,
+    aperture: { type: 'door', ro_w_in: 38, ro_h_in: 83, sill_in: 0, oc: 16, header_nominal: '2x8', header_plies: 2 } },
+];
+
+const INT_APERTURE_MODULES = [
+  { id: 'idoor_4x8_2x4_38x83', label: 'Int Door 38x83', width_mm: 4 * 12 * IN_TO_MM, depth_mm: IWALL_DEPTH, interior: true,
+    aperture: { type: 'door', ro_w_in: 38, ro_h_in: 83, sill_in: 0, oc: 16, header_nominal: '2x4', header_plies: 1 } },
+];
+
+const ALL_MODULES = [...MODULES, ...INTERIOR_MODULES, ...APERTURE_MODULES, ...INT_APERTURE_MODULES];
 
 const DIRECTIONS = ['north', 'south', 'east', 'west'];
 
@@ -334,10 +350,91 @@ function loadIcon(modId, dir) {
   return img;
 }
 
-// Preload all icons
+// Preload all icons (aperture modules have no SVG icons — they draw a plan symbol)
 ALL_MODULES.forEach(mod => {
+  if (mod.aperture) return;
   DIRECTIONS.forEach(dir => loadIcon(mod.id, dir));
 });
+
+// =====================================================
+// APERTURE PLAN SILHOUETTE (top-down floor-plan symbol)
+// Draws a conventional window or door symbol inside the wall rectangle so
+// apertures read like the surrounding wall modules but show their opening.
+// =====================================================
+const APERTURE_GAP = '#0d1322';   // "floor" colour shown through an opening
+
+function drawAperturePlan(p, px, py, pw, ph) {
+  const a = p.mod.aperture;
+  const horiz = isHorizontal(p.dir);
+  const roW = mmToPx(a.ro_w_in * IN_TO_MM);
+  // run = along the wall; cross = through the wall depth
+  const runLen = horiz ? pw : ph;
+  const crossLen = horiz ? ph : pw;
+  const a0 = (runLen - roW) / 2;     // opening start along the run
+  const a1 = a0 + roW;
+
+  // map (alongPos, crossPos) -> canvas (x, y)
+  const T = (along, cross) => horiz
+    ? { x: px + along, y: py + cross }
+    : { x: px + cross, y: py + along };
+
+  // interior side (door swings in / window glass biases here): opposite the
+  // darkened exterior face. For interior walls default to the +cross side.
+  const extAtZero =
+    p.dir === 'north' ? true  :   // exterior at top (cross=0) for horizontal N
+    p.dir === 'west'  ? true  :   // exterior at left (cross=0) for vertical W
+    false;
+  const intCross = extAtZero ? crossLen : 0;     // interior face position
+  const extCross = extAtZero ? 0 : crossLen;
+
+  ctx.save();
+  ctx.lineWidth = 1.5;
+
+  if (a.type === 'door') {
+    // Clear the opening (show floor through it)
+    const c0 = T(a0, 0), c1 = T(a1, crossLen);
+    ctx.fillStyle = APERTURE_GAP;
+    ctx.fillRect(Math.min(c0.x, c1.x), Math.min(c0.y, c1.y),
+                 Math.abs(c1.x - c0.x), Math.abs(c1.y - c0.y));
+    // Door leaf + swing arc, hinged at the a0 jamb on the interior face
+    const hinge = T(a0, intCross);
+    const leafEnd = T(a0, intCross + (intCross === 0 ? roW : -roW));
+    const open = T(a1, intCross);
+    ctx.strokeStyle = p.mod.interior ? '#bb86fc' : '#4fc3f7';
+    ctx.beginPath(); ctx.moveTo(hinge.x, hinge.y); ctx.lineTo(leafEnd.x, leafEnd.y); ctx.stroke();
+    ctx.beginPath();
+    const r = roW;
+    const a_start = Math.atan2(leafEnd.y - hinge.y, leafEnd.x - hinge.x);
+    const a_open  = Math.atan2(open.y - hinge.y, open.x - hinge.x);
+    ctx.strokeStyle = 'rgba(120,160,200,0.5)';
+    ctx.arc(hinge.x, hinge.y, r, a_start, a_open, leafSweepCCW(a_start, a_open));
+    ctx.stroke();
+  } else {
+    // Window: keep the wall, draw the glazing as a double line across the
+    // opening, plus jamb ticks at each end.
+    const gInset = crossLen * 0.34;
+    const g1a = T(a0, gInset), g1b = T(a1, gInset);
+    const g2a = T(a0, crossLen - gInset), g2b = T(a1, crossLen - gInset);
+    ctx.strokeStyle = '#9fd8ff';
+    ctx.beginPath(); ctx.moveTo(g1a.x, g1a.y); ctx.lineTo(g1b.x, g1b.y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(g2a.x, g2a.y); ctx.lineTo(g2b.x, g2b.y); ctx.stroke();
+    // jamb ticks
+    ctx.strokeStyle = '#4fc3f7';
+    for (const j of [a0, a1]) {
+      const t0 = T(j, 0), t1 = T(j, crossLen);
+      ctx.beginPath(); ctx.moveTo(t0.x, t0.y); ctx.lineTo(t1.x, t1.y); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+// Pick the short arc direction between two angles for the door swing.
+function leafSweepCCW(a0, a1) {
+  let d = a1 - a0;
+  while (d <= -Math.PI) d += 2 * Math.PI;
+  while (d > Math.PI) d -= 2 * Math.PI;
+  return d < 0;
+}
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -383,11 +480,23 @@ function draw() {
       else if (p.dir === 'east') ctx.fillRect(px + pw - d, py, d, ph);
     }
 
-    // Label
-    ctx.fillStyle = isInt ? '#bb86fc' : '#aaa';
-    ctx.font = '10px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(isInt ? 'I' : p.dir[0].toUpperCase(), px + pw/2, py + ph/2 + 4);
+    // Aperture plan symbol (window / door), drawn inside the wall rectangle
+    if (p.mod.aperture) drawAperturePlan(p, px, py, pw, ph);
+
+    // Direction label. Walls: centre letter. Apertures: corner letter so it
+    // doesn't clash with the plan symbol, but still shows N/S/E/W orientation.
+    ctx.fillStyle = isInt ? '#bb86fc' : '#cfe8ff';
+    if (p.mod.aperture) {
+      ctx.font = 'bold 10px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(p.dir[0].toUpperCase(), px + 3, py + 3);
+      ctx.textBaseline = 'alphabetic';
+    } else {
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(isInt ? 'I' : p.dir[0].toUpperCase(), px + pw/2, py + ph/2 + 4);
+    }
 
     // Blocking markers for interior wall connections — drawn on exterior side of wall
     if (p.connections) {
@@ -984,8 +1093,57 @@ function buildSidebar() {
     });
   }
 
+  // Aperture palette (temporary): one tile per module, inline plan-symbol
+  // thumbnail, no per-direction icons — pick it, then rotate with R.
+  function apertureThumb(mod) {
+    const win = mod.aperture.type === 'window';
+    const body = win
+      ? `<line x1="14" y1="20" x2="30" y2="20" stroke="#9fd8ff" stroke-width="1.5"/>
+         <line x1="14" y1="24" x2="30" y2="24" stroke="#9fd8ff" stroke-width="1.5"/>
+         <line x1="14" y1="14" x2="14" y2="30" stroke="#4fc3f7" stroke-width="1.5"/>
+         <line x1="30" y1="14" x2="30" y2="30" stroke="#4fc3f7" stroke-width="1.5"/>`
+      : `<line x1="14" y1="30" x2="14" y2="14" stroke="#4fc3f7" stroke-width="1.5"/>
+         <path d="M14 30 A16 16 0 0 1 30 14" fill="none" stroke="rgba(120,160,200,0.6)" stroke-width="1.2"/>
+         <line x1="30" y1="30" x2="30" y2="14" stroke="#4fc3f7" stroke-width="1.5"/>`;
+    const col = mod.interior ? '#bb86fc' : '#4fc3f7';
+    return `<svg width="44" height="44" viewBox="0 0 44 44">
+      <rect x="6" y="14" width="32" height="16" fill="none" stroke="${col}" stroke-width="1.5"
+        ${mod.interior ? 'stroke-dasharray="3,2"' : ''}/>${body}</svg>`;
+  }
+
+  function addApertureSection(title, mods) {
+    const header = document.createElement('h2');
+    header.textContent = title;
+    lib.appendChild(header);
+    mods.forEach(mod => {
+      const group = document.createElement('div');
+      group.className = 'module-group';
+      group.innerHTML = `<h3>${mod.label}</h3>`;
+      const grid = document.createElement('div');
+      grid.className = 'module-grid';
+      const item = document.createElement('div');
+      item.className = 'module-item';
+      item.title = `${mod.label} — pick, then press R to rotate`;
+      if (mod.interior) item.style.borderColor = '#665';
+      item.innerHTML = apertureThumb(mod);
+      item.addEventListener('click', () => {
+        dragState = { mod, dir: 'north' };
+        snapTarget = null;
+        eraseMode = false;
+        document.getElementById('btn-erase').classList.remove('active');
+        canvas.style.cursor = 'copy';
+        draw();
+      });
+      grid.appendChild(item);
+      group.appendChild(grid);
+      lib.appendChild(group);
+    });
+  }
+
   addModuleSection('EXTERIOR', MODULES, DIRECTIONS);
   addModuleSection('INTERIOR', INTERIOR_MODULES, ['north', 'east']); // H and V only
+  addApertureSection('WINDOWS + DOORS', APERTURE_MODULES);
+  addApertureSection('INTERIOR DOORS', INT_APERTURE_MODULES);
 }
 
 // =====================================================
@@ -1256,7 +1414,14 @@ const STUD_THICK = 1.5 * IN_TO_MM;
 const STUD_DEPTH = 5.5 * IN_TO_MM;
 const OSB_THICK = 0.4375 * IN_TO_MM;
 
+// Nominal lumber actual depth (the wider dimension), for header sizing
+const LUMBER_DEPTH = {
+  '2x4': 3.5 * IN_TO_MM, '2x6': 5.5 * IN_TO_MM, '2x8': 7.25 * IN_TO_MM,
+  '2x10': 9.25 * IN_TO_MM, '2x12': 11.25 * IN_TO_MM,
+};
+
 function buildWall3D(mod, dir, xPos, yPos) {
+  if (mod.aperture) return buildAperture3D(mod, dir, xPos, yPos);
   const group = new THREE.Group();
   const isInt = mod.interior;
 
@@ -1336,6 +1501,93 @@ function buildWall3D(mod, dir, xPos, yPos) {
   }
 
   return group;
+}
+
+// Build a window/door panel in 3D, mirroring the FreeCAD generator framing:
+// king studs, jack studs, header, top cripples, (window) sill + lower cripples,
+// plates, and OSB with the opening cut out. Same coord convention as buildWall3D.
+function buildAperture3D(mod, dir, xPos, yPos) {
+  const group = new THREE.Group();
+  const isInt = mod.interior;
+  const a = mod.aperture;
+
+  const W = mod.width_mm;
+  const H = 8 * 12 * IN_TO_MM;
+  const D = isInt ? (3.5 * IN_TO_MM) : STUD_DEPTH;
+  const O = isInt ? 0 : OSB_THICK;
+  const PT = STUD_THICK, ST = STUD_THICK;
+  const wallMat = isInt ? matIWallLumber : matLumber;
+
+  const roW = a.ro_w_in * IN_TO_MM;
+  const roX0 = (W - roW) / 2, roX1 = roX0 + roW;
+  const roZ0 = a.sill_in * IN_TO_MM;              // 0 for a door
+  const roZ1 = roZ0 + a.ro_h_in * IN_TO_MM;
+  const isWin = a.type === 'window' && roZ0 > 0;
+  const hdrDep = LUMBER_DEPTH[a.header_nominal] || 7.25 * IN_TO_MM;
+  const zStudTop = H - PT, zStudBot = PT;
+
+  // cripple X positions on the OC grid that fall inside the opening
+  const cripX = [];
+  let g = a.oc * IN_TO_MM;
+  while (g + ST < roX1) { if (g > roX0) cripX.push(g); g += a.oc * IN_TO_MM; }
+  if (!cripX.length) cripX.push((roX0 + roX1) / 2 - ST / 2);
+
+  const horiz = (dir === 'north' || dir === 'south');
+  const osbAt = horiz
+    ? (dir === 'south' ? -O / 2 : D + O / 2)
+    : (dir === 'west' ? -O / 2 : D + O / 2);
+
+  // place a member given run start/length and z start/length (run = wall length)
+  function member(runStart, runLen, z0, zLen, mat) {
+    if (runLen <= 0 || zLen <= 0) return;
+    if (horiz) addBoxTo(group, runLen, D, zLen, runStart + runLen / 2, D / 2, z0 + zLen / 2, mat);
+    else       addBoxTo(group, D, runLen, zLen, D / 2, -(runStart + runLen / 2), z0 + zLen / 2, mat);
+  }
+  function osb(runStart, runLen, z0, zLen) {
+    if (runLen <= 0 || zLen <= 0 || O <= 0) return;
+    if (horiz) addBoxTo(group, runLen, O, zLen, runStart + runLen / 2, osbAt, z0 + zLen / 2, matOSB);
+    else       addBoxTo(group, O, runLen, zLen, osbAt, -(runStart + runLen / 2), z0 + zLen / 2, matOSB);
+  }
+
+  // Plates: bottom (door = split), top (single, per library convention)
+  if (isWin) member(0, W, 0, PT, wallMat);
+  else { member(0, roX0, 0, PT, wallMat); member(roX1, W - roX1, 0, PT, wallMat); }
+  member(0, W, zStudTop, PT, wallMat);
+
+  // King studs (full height) at panel edges
+  member(0, ST, zStudBot, zStudTop - zStudBot, wallMat);
+  member(W - ST, ST, zStudBot, zStudTop - zStudBot, wallMat);
+  // Jack studs flanking the opening, up to the header underside
+  member(roX0 - ST, ST, zStudBot, roZ1 - zStudBot, wallMat);
+  member(roX1, ST, zStudBot, roZ1 - zStudBot, wallMat);
+  // Header directly above the opening
+  member(roX0 - ST, roW + 2 * ST, roZ1, hdrDep, wallMat);
+  // Top cripples
+  const zAbove = roZ1 + hdrDep;
+  for (const cx of cripX) member(cx, ST, zAbove, zStudTop - zAbove, wallMat);
+  // Window sill + lower cripples
+  if (isWin) {
+    member(roX0, roW, roZ0 - PT, PT, wallMat);
+    for (const cx of cripX) member(cx, ST, zStudBot, (roZ0 - PT) - zStudBot, wallMat);
+  }
+
+  // OSB with the opening cut out: left, right, above, below the rough opening
+  osb(0, roX0, 0, H);
+  osb(roX1, W - roX1, 0, H);
+  osb(roX0, roW, roZ1, H - roZ1);
+  if (roZ0 > 0) osb(roX0, roW, 0, roZ0);
+
+  group.position.x = xPos;
+  if (dir === 'north') group.position.y = -(yPos + D + O);
+  else if (dir === 'south') group.position.y = -(yPos + D);
+  else group.position.y = -yPos;
+  return group;
+}
+
+function addBoxTo(group, sx, sy, sz, px, py, pz, mat) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat);
+  m.position.set(px, py, pz);
+  group.add(m);
 }
 
 function updatePreview() {

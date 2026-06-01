@@ -1,11 +1,13 @@
 # TODO
 
 ## In Progress
-- [ ] Create door and window module specs *(Marcin)*
 
 ## Todo
+- [ ] More aperture types: double door, sliding door, garage header
+- [ ] Adjustable aperture sizes/position in the UI (currently fixed presets)
+- [ ] Library picker redo: 3D isometric thumbnails + single tile per module with N/S/E/W picker (replaces per-direction icons)
+- [ ] Double top plate across the whole wall library (apertures + walls together)
 - [ ] Staging/phasing system: walls first, then roof, then plumbing/elec, then interior
-- [ ] Library view toggle: swap between icon view and image preview of actual module
 - [ ] Mobile/tablet support
 - [ ] OSB notching detection at corners
 
@@ -26,3 +28,4 @@
 - [x] Live BOM estimator (lumber, hardware, cost from pricing.json)
 - [x] 3D preview in browser (three.js)
 - [x] Interior walls with continuous (C1/C2) and transverse (T) blocking
+- [x] Window + door aperture modules (schema, CAD generator, JSON compiler, plan silhouette, 3D, BOM)
