@@ -257,6 +257,13 @@ Previous compiler approaches are archived on the [`legacy`](https://github.com/c
 
 All used the Inkscape/SVG workflow: place icons in Inkscape → parse SVG → assemble in FreeCAD. The web UI approach on `main` replaces this by letting the user control placement directly.
 
+## Progress logs
+
+Dated narrative entries — the design decisions, the why, and commit references
+behind each milestone — live in [`docs/logs/`](docs/logs/). They are the
+greppable companion to the slide decks. Start with the
+[index](docs/logs/README.md) for the newest-first list.
+
 ## License
 
 Licensed under the **GNU Affero General Public License v3.0** (AGPL-3.0). See [LICENSE](LICENSE) for the full text.

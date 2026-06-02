@@ -27,3 +27,6 @@ jobs:
 
       - name: JS parity test
         run: node tests/parity.mjs
+
+      - name: Check Markdown relative links
+        run: python scripts/check_links.py
