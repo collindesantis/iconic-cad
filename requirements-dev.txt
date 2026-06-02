@@ -1,0 +1,2 @@
+# Test/dev tooling — not required to run the app.
+pytest==9.0.3

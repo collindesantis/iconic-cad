@@ -17,7 +17,7 @@ jobs:
           node-version: '20'
 
       - name: Install Python deps
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Assert specs.json is in sync with wall_instances.yaml
         run: python scripts/gen_specs.py && git diff --exit-code web/assets/lib/specs.json

@@ -3,7 +3,7 @@
 ## Build
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt -r requirements-dev.txt
 ./generate.sh          # requires FreeCAD — builds cad_library/
 python3 -m http.server 8080 && open http://localhost:8080/web/
 ```
