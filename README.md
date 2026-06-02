@@ -244,10 +244,6 @@ cad_library/             # Generated .FCStd modules (run generate.sh)
 docs/                    # Module-authoring guide + aperture framing reference
 ```
 
-## Roadmap
-
-See [TODO.md](TODO.md) for the current task list and planned features.
-
 ## Legacy workflows
 
 Previous compiler approaches are archived on the [`legacy`](https://github.com/collindesantis/iconic-cad/tree/legacy) branch:
