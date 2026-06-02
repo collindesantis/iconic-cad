@@ -19,23 +19,37 @@ git clone https://github.com/collindesantis/iconic-cad.git
 cd iconic-cad
 ```
 
-### 2. Generate the wall module library
+### 2. Install Python dependencies
 
 ```bash
-freecadcmd -c "import sys; sys.argv=['generate_wall_library.py','wall_instances.yaml']; exec(open('generate_wall_library.py').read())"
+pip install -r requirements.txt
+```
+
+### 3. Generate the wall module library
+
+```bash
+./generate.sh
 ```
 
 This creates `cad_library/` with FreeCAD .FCStd files for each wall module type (exterior and interior).
 
-> **Note:** Re-run this command after pulling new changes - wall specs may have been added or updated since your last generation.
+> **Note:** Re-run after pulling new changes — wall specs may have been added or updated since your last generation.
 
-### 3. Start the web server
+<details>
+<summary>Raw freecadcmd command</summary>
+
+```bash
+freecadcmd -c "import sys; sys.argv=['generate_wall_library.py','wall_instances.yaml']; exec(open('generate_wall_library.py').read())"
+```
+</details>
+
+### 4. Start the web server
 
 ```bash
 python3 -m http.server 8080
 ```
 
-### 4. Design your layout
+### 5. Design your layout
 
 Open http://localhost:8080/web/ in your browser.
 
@@ -48,37 +62,51 @@ Open http://localhost:8080/web/ in your browser.
 - Right-click or Escape to cancel a placement
 - Click **Export JSON** when done
 
-### 5. Compile to 3D
+### 6. Compile to 3D
 
 ```bash
-freecadcmd -c "import sys; sys.argv=['compile_from_json.py','layout.json']; exec(open('compile_from_json.py').read())"
+./compile.sh layout.json
 ```
 
 Replace `layout.json` with whatever your exported file is named (e.g. `layout(2).json`). The output `.FCStd` file will have the same name.
 
-### 6. View the result
+<details>
+<summary>Raw freecadcmd command</summary>
+
+```bash
+freecadcmd -c "import sys; sys.argv=['compile_from_json.py','layout.json']; exec(open('compile_from_json.py').read())"
+```
+</details>
+
+### 7. View the result
 
 Open the resulting `.FCStd` file in FreeCAD.
 
 ## Dependencies
 
-- **FreeCAD** (with `freecadcmd` CLI) - generates and compiles wall modules
-- **Python 3** with **PyYAML** - reads wall instance definitions
-- **A web browser** - runs the layout tool (no internet required)
+- **FreeCAD** (with `freecadcmd` CLI) — generates the wall module library and compiles layouts to `.FCStd`
+- **Python 3** with **PyYAML**, **numpy**, **ifcopenshell** — see `requirements.txt`
+- **A web browser** — runs the layout tool (no internet required after initial load)
 
 ```bash
+# Install Python deps (all platforms)
+pip install -r requirements.txt
+
+# FreeCAD — system package
 # Arch Linux
-sudo pacman -S freecad python-yaml
+sudo pacman -S freecad
 
 # Debian / Ubuntu
-sudo apt install freecad python3-yaml
+sudo apt install freecad
 
 # Fedora
-sudo dnf install freecad python3-pyyaml
+sudo dnf install freecad
 
 # openSUSE
-sudo zypper install freecad python3-PyYAML
+sudo zypper install freecad
 ```
+
+**Tested with:** FreeCAD 1.1.1, Python 3.14.5, ifcopenshell 0.8.5, on Arch Linux.
 
 ## How it works
 
