@@ -1,0 +1,40 @@
+{
+  "version": 2,
+  "units": "mm",
+  "levels": [{"id": "L1", "name": "Level 1", "z_mm": 0}],
+  "layers": [{"id": "structural", "name": "Structural", "color": "#4fc3f7", "visible": true}],
+  "entities": [
+    {
+      "id": "wall0",
+      "kind": "wall",
+      "module": "wall_4x8_2x6_16oc",
+      "direction": "north",
+      "x_mm": 0,
+      "y_mm": 0,
+      "level": "L1",
+      "layer": "structural",
+      "width_mm": 1219.2,
+      "depth_mm": 150.8125
+    },
+    {
+      "id": "iwall0",
+      "kind": "iwall",
+      "module": "iwall_4x8_2x4_16oc",
+      "direction": "east",
+      "x_mm": 382.0,
+      "y_mm": 150.8125,
+      "level": "L1",
+      "layer": "structural",
+      "width_mm": 1219.2,
+      "depth_mm": 88.9,
+      "connections": [
+        {
+          "target_id": "wall0",
+          "blocking": "C1",
+          "contact_x_mm": 426.45,
+          "contact_y_mm": 150.8125
+        }
+      ]
+    }
+  ]
+}
