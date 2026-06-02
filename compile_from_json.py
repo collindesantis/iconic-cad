@@ -20,8 +20,13 @@ import os
 import sys
 
 import yaml
-import FreeCAD as App
-import Part  # noqa: F401
+
+try:
+    import FreeCAD as App
+    import Part  # noqa: F401
+    _FREECAD = True
+except ImportError:
+    _FREECAD = False
 
 CAD_LIBRARY = "cad_library"
 YAML_PATH = "wall_instances.yaml"
@@ -319,6 +324,10 @@ def create_blocking(conn, target_mod, modules_by_id, yaml_specs, min_x, min_y):
 
 
 def main():
+    if not _FREECAD:
+        print("Error: FreeCAD not available. Run via freecadcmd.")
+        sys.exit(1)
+
     if len(sys.argv) != 2:
         print("Usage: compile_from_json.py <layout.json>")
         sys.exit(1)
@@ -327,9 +336,9 @@ def main():
     with open(json_path) as f:
         data = json.load(f)
 
-    modules = data["modules"]
+    modules = data.get("entities") or data.get("modules") or []
     if not modules:
-        print("No modules in layout")
+        print("Error: no entities/modules in layout JSON")
         sys.exit(1)
 
     # Load YAML specs for blocking calculations
@@ -385,4 +394,5 @@ def main():
     print(f"\nSaved {out_abs} ({len(modules)} walls, {blocking_idx} blocking pieces)")
 
 
-main()
+if __name__ == '__main__':
+    main()
