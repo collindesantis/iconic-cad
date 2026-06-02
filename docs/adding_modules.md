@@ -6,14 +6,21 @@ module (sliding door, double door, garage header, etc.).
 
 ## The pipeline (what you're plugging into)
 
-Per the Iconic CAD Protocol, one YAML schema compiles two ways:
+Per the Iconic CAD Protocol, one YAML schema compiles three ways:
 
 ```
-wall_instances.yaml ──generate_wall_library.py──▶ cad_library/<id>.FCStd   (the part)
-        (schema)                                          │
+wall_instances.yaml ──scripts/gen_specs.py──▶ web/assets/lib/specs.json
+        (schema)   ──generate_wall_library.py──▶ cad_library/<id>.FCStd   (the part)
+                                                          │
                                                           ▼
-web UI (index.html) ──Export──▶ layout.json ──compile_from_json.py──▶ House.FCStd
-   place + snap + 3D + BOM
+web UI (web/js/) ──Export──▶ layout.json ──compile_from_json.py──▶ House.FCStd
+  place + snap                   │         (Python + FreeCAD, ./compile.sh)
+  3D + BOM                       │
+                                  ├──web/js/fcstd.js──▶ house.FCStd
+                                  │   (browser, no terminal)
+                                  │
+                                  └──export_ifc.py──▶ house.ifc
+                                      (Python, requires ifcopenshell)
 ```
 
 The YAML is the single source of truth. The generator turns each instance into
@@ -75,23 +82,34 @@ freecadcmd -c "import sys; sys.argv=['generate_wall_library.py','wall_instances.
 Verify a panel's framing by measuring its solids (W × D × H, origin) in
 `freecadcmd` — that's how the reference dims were checked.
 
-### 3. Web UI placement + plan silhouette — `web/index.html`
+### 3. Web UI placement + plan silhouette — `web/js/constants.js`, `web/js/render2d.js`
 
 - Add the module to `APERTURE_MODULES` (exterior) or `INT_APERTURE_MODULES`
-  (interior) with an `aperture` metadata object (inches). These flow into
-  `ALL_MODULES`, so snapping/ports/save/load work for free.
-- `drawAperturePlan()` renders the conventional top-down floor-plan symbol —
-  glazing double-line + jamb ticks for a window; opening gap + leaf + swing arc
-  for a door (hinged to the interior side).
+  (interior) in `web/js/constants.js` with an `aperture` metadata object (inches).
+  These flow into `ALL_MODULES`, so snapping/ports/save/load work for free.
+- `drawAperturePlan()` in `web/js/render2d.js` renders the conventional top-down
+  floor-plan symbol — glazing double-line + jamb ticks for a window; opening gap
+  + leaf + swing arc for a door (hinged to the interior side).
 - The library palette tile uses an inline-SVG plan thumbnail (no icon files);
-  pick it, then press **R** to rotate. (The palette is a temporary surface
-  pending the planned 3D-thumbnail picker.)
+  pick it, then press **R** to rotate.
 
-### 4. 3D preview — `web/index.html`
+### 3b. Browser FreeCAD export specs — `scripts/gen_specs.py`
 
-`buildAperture3D()` mirrors the generator framing in three.js so the live
-preview shows the real opening (OSB cut out around the RO). `buildWall3D()`
-dispatches to it for any module with an `aperture`.
+After adding the module to `wall_instances.yaml`, regenerate the wall specs used
+by the browser FreeCAD export:
+
+```bash
+python scripts/gen_specs.py
+```
+
+This updates `web/assets/lib/specs.json`. Commit both the YAML change and the
+regenerated JSON together. CI asserts they stay in sync.
+
+### 4. 3D preview — `web/js/render3d.js`
+
+`buildAperture3D()` in `web/js/render3d.js` mirrors the generator framing in
+three.js so the live preview shows the real opening (OSB cut out around the RO).
+`buildWall3D()` dispatches to it for any module with an `aperture`.
 
 ### 5. BOM — `web/pricing.json`
 
@@ -103,9 +121,12 @@ the entry's `notes`.
 ## Checklist for a new module
 
 - [ ] `wall_instances.yaml` instance added
-- [ ] `generate_wall_library.py` builds it (run generator, measure solids)
-- [ ] `compile_from_json.py` reassembles it (run a test layout.json)
-- [ ] `web/index.html`: module entry + plan symbol + 3D + palette tile
+- [ ] `generate_wall_library.py` builds it (run `./generate.sh`, measure solids)
+- [ ] `compile_from_json.py` reassembles it (run `./compile.sh test_layout.json`)
+- [ ] `web/js/constants.js`: module entry in `APERTURE_MODULES` / `INT_APERTURE_MODULES`
+- [ ] `web/js/render2d.js`: plan silhouette in `drawAperturePlan()`
+- [ ] `web/js/render3d.js`: 3D framing in `buildAperture3D()`
+- [ ] `scripts/gen_specs.py`: re-run → commit updated `web/assets/lib/specs.json`
 - [ ] `web/pricing.json`: BOM spec
 - [ ] dims sourced from real CAD / code, not guessed — record them in
       [aperture_framing_reference.md](aperture_framing_reference.md)
