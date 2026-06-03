@@ -261,7 +261,7 @@ compile.sh               # Wrapper: run compile_from_json.py via freecadcmd
 tests/                   # Parity + unit tests (no FreeCAD required)
 icons/                   # 24 directional SVG icons (exterior + interior walls)
 cad_library/             # Generated .FCStd modules (run generate.sh)
-docs/                    # Module-authoring guide + aperture framing reference
+docs/                    # Module-authoring guide, aperture framing reference, design decisions
 ```
 
 ## Legacy workflows
@@ -283,6 +283,10 @@ Dated narrative entries — the design decisions, the why, and commit references
 behind each milestone — live in [`docs/logs/`](docs/logs/). They are the
 greppable companion to the slide decks. Start with the
 [index](docs/logs/README.md) for the newest-first list.
+
+## Design decisions
+
+Why the tool is shaped the way it is — the no-backend constraint, framing-as-backbone, and the rejected compiler approaches — is documented in [`docs/design_decisions.md`](docs/design_decisions.md). Read it before proposing architectural changes.
 
 ## License
 
