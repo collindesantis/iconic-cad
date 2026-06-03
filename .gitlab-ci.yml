@@ -19,7 +19,9 @@ test:
     - *node-setup
     - pip install --quiet -r requirements.txt -r requirements-dev.txt
   script:
-    - python scripts/gen_specs.py && git diff --exit-code web/assets/lib/specs.json
+    - python -c "import shutil; shutil.copy('web/assets/lib/specs.json', '/tmp/specs_orig.json')"
+    - python scripts/gen_specs.py
+    - python -c "import sys,json; a=json.load(open('/tmp/specs_orig.json')); b=json.load(open('web/assets/lib/specs.json')); sys.exit('specs.json out of sync -- re-run gen_specs.py' if a!=b else 0)"
     - python -m pytest tests/test_blocking_math.py -v
     - node tests/parity.mjs
     - python scripts/check_links.py
