@@ -1,0 +1,40 @@
+stages:
+  - test
+  - deploy
+
+# python:3.12-slim has pip; we install Node from NodeSource to get v20.
+# Single image avoids managing two containers and matches the GitHub CI's
+# "one job, both runtimes" shape.
+default:
+  image: python:3.12-slim
+
+.node-setup: &node-setup
+  - apt-get update -qq && apt-get install -y -qq curl
+  - curl -fsSL https://deb.nodesource.com/setup_20.x | bash - > /dev/null
+  - apt-get install -y -qq nodejs
+
+test:
+  stage: test
+  before_script:
+    - *node-setup
+    - pip install --quiet -r requirements.txt -r requirements-dev.txt
+  script:
+    - python scripts/gen_specs.py && git diff --exit-code web/assets/lib/specs.json
+    - python -m pytest tests/test_blocking_math.py -v
+    - node tests/parity.mjs
+    - python scripts/check_links.py
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+pages:
+  stage: deploy
+  image: busybox
+  script:
+    - mkdir -p public
+    - cp -r web/. public/
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
