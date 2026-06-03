@@ -4,7 +4,7 @@
 # Source: https://wiki.opensourceecology.org/wiki/Wall_instances.yaml
 
 instances:
-  - id: wall_4x8_2x6_24oc_osb716_south
+  - id: wall_4x8_2x6_24oc
     family: framed_wall_panel
     parameters:
       nominal_width_ft: 4.0
@@ -15,7 +15,7 @@ instances:
       exterior_face: south
       reference_house_orientation: faces_south
 
-  - id: wall_4x8_2x6_16oc_osb716_south
+  - id: wall_4x8_2x6_16oc
     family: framed_wall_panel
     parameters:
       nominal_width_ft: 4.0
@@ -26,7 +26,7 @@ instances:
       exterior_face: south
       reference_house_orientation: faces_south
 
-  - id: wall_3x8.5_2x6_16oc_osb716_south
+  - id: wall_3x8.5_2x6_16oc
     family: framed_wall_panel
     parameters:
       nominal_width_ft: 3.0
@@ -82,7 +82,7 @@ instances:
 
   # Exterior window — 2x6 + OSB, 36"x48" rough opening, sill at 24".
   # Available in 8', 9', and 10' module heights per OSE window spec.
-  - id: window_4x8_2x6_36x48_south
+  - id: window_4x8_2x6_36x48
     family: aperture_wall_panel
     parameters:
       nominal_width_ft: 4.0
@@ -100,7 +100,7 @@ instances:
         header_lumber_nominal: "2x8"
         header_plies: 2
 
-  - id: window_4x9_2x6_36x48_south
+  - id: window_4x9_2x6_36x48
     family: aperture_wall_panel
     parameters:
       nominal_width_ft: 4.0
@@ -118,7 +118,7 @@ instances:
         header_lumber_nominal: "2x8"
         header_plies: 2
 
-  - id: window_4x10_2x6_36x48_south
+  - id: window_4x10_2x6_36x48
     family: aperture_wall_panel
     parameters:
       nominal_width_ft: 4.0
@@ -137,7 +137,7 @@ instances:
         header_plies: 2
 
   # Exterior door — 2x6 + OSB, 38"x83" rough opening, opening to the floor.
-  - id: door_4x8_2x6_38x83_south
+  - id: door_4x8_2x6_38x83
     family: aperture_wall_panel
     parameters:
       nominal_width_ft: 4.0
@@ -156,7 +156,7 @@ instances:
         header_plies: 2
 
   # Exterior door (out-swing) — same framing as door_4x8_2x6_38x83, swing flag only.
-  - id: door_out_4x8_2x6_38x83_south
+  - id: door_out_4x8_2x6_38x83
     family: aperture_wall_panel
     parameters:
       nominal_width_ft: 4.0
@@ -177,7 +177,7 @@ instances:
 
   # Double door — 8' wide panel, 72" x 83" RO, doubled 2x12 header.
   # Standard double-door RO per IRC: two 3'-0" doors + center stile = ~72" total.
-  - id: double_door_8x8_2x6_72x83_south
+  - id: double_door_8x8_2x6_72x83
     family: aperture_wall_panel
     parameters:
       nominal_width_ft: 8.0
@@ -196,7 +196,7 @@ instances:
         header_plies: 2
 
   # Sliding glass door — 8' wide panel, 72" x 80" RO (standard 6-0 x 6-8 patio).
-  - id: sliding_8x8_2x6_72x80_south
+  - id: sliding_8x8_2x6_72x80
     family: aperture_wall_panel
     parameters:
       nominal_width_ft: 8.0
@@ -216,7 +216,7 @@ instances:
 
   # Garage door — 9' wide panel, 96" x 84" RO (standard 8-0 x 7-0 single garage).
   # Header is a built-up LVL or doubled 2x12 over the 8' span.
-  - id: garage_9x8_2x6_96x84_south
+  - id: garage_9x8_2x6_96x84
     family: aperture_wall_panel
     parameters:
       nominal_width_ft: 9.0

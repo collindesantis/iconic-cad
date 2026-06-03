@@ -144,7 +144,9 @@ def create_blocking(conn, target_mod, modules_by_id, yaml_specs, min_x, min_y):
     if not target:
         return []
 
-    # Find YAML params for the target wall (strip _south suffix variants)
+    # Find YAML params for the target wall. Module ids now match the YAML id
+    # exactly (build_lib enforces one id scheme); the prefix match is retained
+    # defensively and as a no-op for the exact-match case.
     target_module = target["module"]
     params = None
     for key, val in yaml_specs.items():
