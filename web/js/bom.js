@@ -1,13 +1,80 @@
 // =====================================================
 // BOM ESTIMATOR — runs on model change only (not per mousemove).
+//
+// Model: the BOM is the SUM of generic line items {material_key, qty, unit},
+// contributed by one source per trade layer, priced against a flat material
+// catalog (pricing.json lumber + hardware). Today there is exactly one source:
+// structural framing (via lineItemsForEntity -> enumerateMembers). A future
+// trade (electrical, foundation, roofing…) is just another source emitting the
+// same shape into the same aggregator. The aggregator below is therefore
+// generic: it sums by material_key and never references roles/nominals/studs.
 // =====================================================
 import { doc } from './state.js';
+import { enumerateMembers } from './members.js';
+import { IN_TO_MM } from './constants.js';
 
 let pricingData = null;
 
 export async function loadPricing() {
   const resp = await fetch('pricing.json');
   pricingData = await resp.json();
+}
+
+// Member roles that are cut from stud stock vs plate stock (display + stocking).
+const STUD_ROLES = new Set(['stud', 'king', 'jack', 'top_cripple', 'lower_cripple']);
+const PLATE_ROLES = new Set(['bottom_plate', 'top_plate', 'sill', 'subheader', 'sill_block']);
+
+// Map one framing member to its catalog stock key.
+function stockKeyFor(m, is2x4, plateLenFt) {
+  if (PLATE_ROLES.has(m.role)) {
+    return is2x4 ? (plateLenFt <= 4 ? '2x4_8ft' : '2x4_10ft')
+                 : (plateLenFt <= 4 ? '2x6_8ft' : '2x6_12ft');
+  }
+  if (m.role === 'header') return m.nominal; // TODO: catalog lacks 2x8/2x12 header stock; priced 0 until added
+  return is2x4 ? '2x4_8ft' : '2x6_8ft'; // stud-like
+}
+
+// The ONE adapter that knows about "members". Everything downstream is generic.
+// For a structural framing entity it expands the member list into stock line
+// items; other (future) layers return their own items or nothing.
+export function lineItemsForEntity(entity) {
+  const items = [];
+  if (entity.kind !== 'wall' && entity.kind !== 'iwall') return items; // ignore non-framing layers
+  const mod = entity.mod;
+  const is2x4 = !!mod.interior;
+  const s = pricingData && pricingData.module_specs[mod.id];
+  const plateLenFt = s ? s.plate_length_ft : (mod.width_mm / IN_TO_MM / 12);
+
+  for (const m of enumerateMembers(mod)) {
+    if (m.role === 'sheathing') continue; // OSB sourced as sheets via the shim below
+    items.push({ material_key: stockKeyFor(m, is2x4, plateLenFt), qty: m.plies || 1, unit: 'each' });
+  }
+
+  // Framing-specific shim: quantities the enumerator does not model yet (OSB
+  // sheets, nails, screws). These become derived once their enumerators exist.
+  if (s) {
+    if (s.osb_sheets) items.push({ material_key: 'osb_7_16_4x8', qty: s.osb_sheets, unit: 'sheet' });
+    const nails = (s.nails_edge || 0) + (s.nails_center || 0);
+    if (nails) items.push({ material_key: 'nail_16d_sinker', qty: nails, unit: 'each' });
+    if (s.corner_screws) items.push({ material_key: 'screw_3in', qty: s.corner_screws, unit: 'each' });
+  }
+  return items;
+}
+
+// Framing-aware DISPLAY breakdown (studs vs plates per nominal). Only the cost
+// aggregator must stay generic; the rendered rows may name framing concepts.
+function framingBreakdown(placed) {
+  const b = { studs2x6: 0, plates2x6: 0, studs2x4: 0, plates2x4: 0 };
+  for (const p of placed) {
+    if (p.kind !== 'wall' && p.kind !== 'iwall') continue;
+    const is2x4 = !!p.mod.interior;
+    for (const m of enumerateMembers(p.mod)) {
+      if (m.nominal !== '2x6' && m.nominal !== '2x4') continue;
+      if (STUD_ROLES.has(m.role)) b[is2x4 ? 'studs2x4' : 'studs2x6']++;
+      else if (PLATE_ROLES.has(m.role)) b[is2x4 ? 'plates2x4' : 'plates2x6']++;
+    }
+  }
+  return b;
 }
 
 export function updateBOM() {
@@ -19,52 +86,32 @@ export function updateBOM() {
     return;
   }
 
-  const counts = {};
-  for (const p of placed) counts[p.mod.id] = (counts[p.mod.id] || 0) + 1;
-
-  let totalStuds2x6 = 0, totalStuds2x4 = 0, totalPlates2x6 = 0, totalPlates2x4 = 0, totalOSB = 0;
-  let totalNails = 0, totalScrews = 0;
-  let totalCost = 0;
-
-  const lumber = pricingData.lumber;
-  const hw = pricingData.hardware;
-  const specs = pricingData.module_specs;
-
-  for (const [modId, count] of Object.entries(counts)) {
-    const s = specs[modId];
-    if (!s) continue;
-
-    const is2x4 = s.lumber_type === '2x4';
-    if (is2x4) {
-      totalStuds2x4 += s.studs * count;
-      totalPlates2x4 += s.plates * count;
-    } else {
-      totalStuds2x6 += s.studs * count;
-      totalPlates2x6 += s.plates * count;
-    }
-    totalOSB += s.osb_sheets * count;
-    totalNails += (s.nails_edge + s.nails_center) * count;
-    totalScrews += s.corner_screws * count;
-
-    const studKey = is2x4 ? '2x4_8ft' : '2x6_8ft';
-    totalCost += s.studs * count * lumber[studKey].unit_price;
-    const plateKey = is2x4
-      ? (s.plate_length_ft <= 4 ? '2x4_8ft' : '2x4_10ft')
-      : (s.plate_length_ft <= 4 ? '2x6_8ft' : '2x6_12ft');
-    totalCost += s.plates * count * lumber[plateKey].unit_price;
-    totalCost += s.osb_sheets * count * lumber['osb_7_16_4x8'].unit_price;
-    totalCost += (s.nails_edge + s.nails_center) * count * hw['nail_16d_sinker'].unit_price;
-    totalCost += s.corner_screws * count * hw['screw_3in'].unit_price;
+  // Generic aggregate: sum every source's line items by material_key, price
+  // against the flat catalog. No framing concepts here.
+  const catalog = { ...pricingData.lumber, ...pricingData.hardware };
+  const agg = {};
+  for (const e of placed) {
+    for (const li of lineItemsForEntity(e)) agg[li.material_key] = (agg[li.material_key] || 0) + li.qty;
   }
+  let totalCost = 0;
+  for (const [key, qty] of Object.entries(agg)) {
+    const c = catalog[key];
+    if (c) totalCost += qty * c.unit_price;
+  }
+
+  const b = framingBreakdown(placed);
+  const totalOSB = agg['osb_7_16_4x8'] || 0;
+  const totalNails = agg['nail_16d_sinker'] || 0;
+  const totalScrews = agg['screw_3in'] || 0;
 
   el.innerHTML = `
     <table style="width:100%; border-collapse:collapse;">
       <tr><td>Modules</td><td style="text-align:right">${placed.length}</td></tr>
       <tr><td colspan="2" style="border-top:1px solid #333; padding-top:4px; color:#667; font-weight:bold;">Lumber</td></tr>
-      ${totalStuds2x6 ? `<tr><td>2x6 studs</td><td style="text-align:right">${totalStuds2x6}</td></tr>` : ''}
-      ${totalPlates2x6 ? `<tr><td>2x6 plates</td><td style="text-align:right">${totalPlates2x6}</td></tr>` : ''}
-      ${totalStuds2x4 ? `<tr><td>2x4 studs</td><td style="text-align:right">${totalStuds2x4}</td></tr>` : ''}
-      ${totalPlates2x4 ? `<tr><td>2x4 plates</td><td style="text-align:right">${totalPlates2x4}</td></tr>` : ''}
+      ${b.studs2x6 ? `<tr><td>2x6 studs</td><td style="text-align:right">${b.studs2x6}</td></tr>` : ''}
+      ${b.plates2x6 ? `<tr><td>2x6 plates</td><td style="text-align:right">${b.plates2x6}</td></tr>` : ''}
+      ${b.studs2x4 ? `<tr><td>2x4 studs</td><td style="text-align:right">${b.studs2x4}</td></tr>` : ''}
+      ${b.plates2x4 ? `<tr><td>2x4 plates</td><td style="text-align:right">${b.plates2x4}</td></tr>` : ''}
       <tr><td>OSB sheets</td><td style="text-align:right">${totalOSB}</td></tr>
       <tr><td colspan="2" style="border-top:1px solid #333; padding-top:4px; color:#667; font-weight:bold;">Hardware</td></tr>
       <tr><td>16d nails</td><td style="text-align:right">${totalNails}</td></tr>

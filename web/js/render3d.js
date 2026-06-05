@@ -12,7 +12,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { doc } from './state.js';
-import { IN_TO_MM, STUD_THICK, STUD_DEPTH, OSB_THICK, LUMBER_DEPTH } from './constants.js';
+import { IN_TO_MM, STUD_DEPTH, OSB_THICK } from './constants.js';
+import { enumerateMembers } from './members.js';
 
 let renderer, scene, camera, controls, modelRoot;
 let hasFitted = false;
@@ -58,126 +59,37 @@ function addBoxTo(group, sx, sy, sz, px, py, pz, mat) {
   group.add(m);
 }
 
+// Build a panel's three.js group from its member list (the one source of truth,
+// see members.js). Members are panel-local flat (x across width, z vertical);
+// this maps them into the scene by `dir`, choosing the OSB face side, exactly as
+// the old hand-written loops did. 3D output is identical by construction.
 export function buildWall3D(mod, dir, xPos, yPos) {
-  if (mod.aperture) return buildAperture3D(mod, dir, xPos, yPos);
   const group = new THREE.Group();
   const isInt = mod.interior;
-
-  const W = mod.width_mm;
-  const H = (mod.id.includes('8.5') ? 8.5 : 8) * 12 * IN_TO_MM;
   const D = isInt ? (3.5 * IN_TO_MM) : STUD_DEPTH;
   const O = isInt ? 0 : OSB_THICK;
-  const PT = STUD_THICK;
-  const ST = STUD_THICK;
   const wallMat = isInt ? matIWallLumber : matLumber;
-
-  const oc = mod.id.includes('16oc') ? 16 : mod.id.includes('24oc') ? 24 : 18;
-  const studPos = [0];
-  let cur = oc * IN_TO_MM;
-  while (cur + ST <= W - ST) { studPos.push(cur); cur += oc * IN_TO_MM; }
-  studPos.push(W - ST);
-  const studH = H - 2 * PT;
-
-  function addBox(sx, sy, sz, px, py, pz, mat) { addBoxTo(group, sx, sy, sz, px, py, pz, mat); }
-
-  if (dir === 'north' || dir === 'south') {
-    const osbY = dir === 'south' ? -O / 2 : D + O / 2;
-    addBox(W, D, PT, W/2, D/2, PT/2, wallMat);
-    addBox(W, D, PT, W/2, D/2, H - PT/2, wallMat);
-    for (const sx of studPos) addBox(ST, D, studH, sx + ST/2, D/2, PT + studH/2, wallMat);
-    if (O > 0) addBox(W, O, H, W/2, osbY, H/2, matOSB);
-  } else {
-    const osbX = dir === 'west' ? -O / 2 : D + O / 2;
-    addBox(D, W, PT, D/2, -W/2, PT/2, wallMat);
-    addBox(D, W, PT, D/2, -W/2, H - PT/2, wallMat);
-    for (const sy of studPos) addBox(D, ST, studH, D/2, -(sy + ST/2), PT + studH/2, wallMat);
-    if (O > 0) addBox(O, W, H, osbX, -W/2, H/2, matOSB);
-  }
-
-  group.position.x = xPos;
-  if (dir === 'north') group.position.y = -(yPos + D + O);
-  else if (dir === 'south') group.position.y = -(yPos + D);
-  else group.position.y = -yPos;
-
-  return group;
-}
-
-// Window/door panel mirroring the FreeCAD generator framing.
-function buildAperture3D(mod, dir, xPos, yPos) {
-  const group = new THREE.Group();
-  const isInt = mod.interior;
-  const a = mod.aperture;
-
-  const W = mod.width_mm;
-  const H = (a.height_ft || (mod.id.includes('4x9') ? 9 : mod.id.includes('4x10') ? 10 : 8)) * 12 * IN_TO_MM;
-  const D = isInt ? (3.5 * IN_TO_MM) : STUD_DEPTH;
-  const O = isInt ? 0 : OSB_THICK;
-  const PT = STUD_THICK, ST = STUD_THICK;
-  const wallMat = isInt ? matIWallLumber : matLumber;
-
-  const roW = a.ro_w_in * IN_TO_MM;
-  const roX0 = (W - roW) / 2, roX1 = roX0 + roW;
-  const roZ0 = a.sill_in * IN_TO_MM;
-  const roZ1 = roZ0 + a.ro_h_in * IN_TO_MM;
-  const isWin = a.type === 'window' && roZ0 > 0;
-  const hdrDep = LUMBER_DEPTH[a.header_nominal] || 7.25 * IN_TO_MM;
-  const zStudTop = H - PT, zStudBot = PT;
-
-  const cripX = [];
-  let g = a.oc * IN_TO_MM;
-  while (g + ST < roX1) { if (g > roX0) cripX.push(g); g += a.oc * IN_TO_MM; }
-  if (!cripX.length) cripX.push((roX0 + roX1) / 2 - ST / 2);
-
   const horiz = (dir === 'north' || dir === 'south');
-  const osbAt = horiz
-    ? (dir === 'south' ? -O / 2 : D + O / 2)
-    : (dir === 'west' ? -O / 2 : D + O / 2);
+  const osbAt = (dir === 'south' || dir === 'west') ? -O / 2 : D + O / 2;
 
-  function member(runStart, runLen, z0, zLen, mat) {
-    if (runLen <= 0 || zLen <= 0) return;
-    if (horiz) addBoxTo(group, runLen, D, zLen, runStart + runLen / 2, D / 2, z0 + zLen / 2, mat);
-    else       addBoxTo(group, D, runLen, zLen, D / 2, -(runStart + runLen / 2), z0 + zLen / 2, mat);
-  }
-  function osb(runStart, runLen, z0, zLen) {
-    if (runLen <= 0 || zLen <= 0 || O <= 0) return;
-    if (horiz) addBoxTo(group, runLen, O, zLen, runStart + runLen / 2, osbAt, z0 + zLen / 2, matOSB);
-    else       addBoxTo(group, O, runLen, zLen, osbAt, -(runStart + runLen / 2), z0 + zLen / 2, matOSB);
-  }
-
-  if (isWin) member(0, W, 0, PT, wallMat);
-  else { member(0, roX0, 0, PT, wallMat); member(roX1, W - roX1, 0, PT, wallMat); }
-  member(0, W, zStudTop, PT, wallMat);
-
-  member(0, ST, zStudBot, zStudTop - zStudBot, wallMat);
-  member(W - ST, ST, zStudBot, zStudTop - zStudBot, wallMat);
-  member(roX0 - ST, ST, zStudBot, roZ1 - zStudBot, wallMat);
-  member(roX1, ST, zStudBot, roZ1 - zStudBot, wallMat);
-  member(roX0 - ST, roW + 2 * ST, roZ1, hdrDep, wallMat);
-  const zAbove = roZ1 + hdrDep;
-  for (const cx of cripX) member(cx, ST, zAbove, zStudTop - zAbove, wallMat);
-  if (isWin) {
-    const zSillBot = roZ0 - PT;
-    member(roX0, roW, zSillBot, PT, wallMat);
-    const zCripBot = zStudBot;
-    for (const cx of cripX) member(cx, ST, zCripBot, zSillBot - zCripBot, wallMat);
-    if (zSillBot - zCripBot > PT + 1) {
-      member(roX0, roW, zCripBot, PT, wallMat);
-      const blockSpacing = 24 * IN_TO_MM;
-      for (let zb = zCripBot + blockSpacing; zb + PT < zSillBot - 1; zb += blockSpacing) {
-        member(roX0, roW, zb, PT, wallMat);
-      }
+  for (const m of enumerateMembers(mod)) {
+    const cx = m.x_mm + m.w_mm / 2;
+    const cz = m.z_mm + m.h_mm / 2;
+    if (m.role === 'sheathing') {
+      if (O <= 0) continue;
+      if (horiz) addBoxTo(group, m.w_mm, O, m.h_mm, cx, osbAt, cz, matOSB);
+      else       addBoxTo(group, O, m.w_mm, m.h_mm, osbAt, -cx, cz, matOSB);
+    } else {
+      if (horiz) addBoxTo(group, m.w_mm, D, m.h_mm, cx, D / 2, cz, wallMat);
+      else       addBoxTo(group, D, m.w_mm, m.h_mm, D / 2, -cx, cz, wallMat);
     }
   }
 
-  osb(0, roX0, 0, H);
-  osb(roX1, W - roX1, 0, H);
-  osb(roX0, roW, roZ1, H - roZ1);
-  if (roZ0 > 0) osb(roX0, roW, 0, roZ0);
-
   group.position.x = xPos;
   if (dir === 'north') group.position.y = -(yPos + D + O);
   else if (dir === 'south') group.position.y = -(yPos + D);
   else group.position.y = -yPos;
+
   return group;
 }
 

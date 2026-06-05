@@ -13,173 +13,128 @@
   },
   "module_specs": {
     "wall_4x8_2x6_16oc": {
-      "studs": 5,
-      "plates": 2,
       "osb_sheets": 1,
       "plate_length_ft": 4,
       "stud_length_ft": 8,
       "nails_edge": 26,
       "nails_center": 18,
-      "corner_screws": 4,
-      "notes": "5 studs (2 end + 3 interior at 16\" OC), 2 plates (top+bottom), 1 OSB sheet. Edge nailing 6\" OC on perimeter studs/plates, center nailing 12\" OC on interior studs."
+      "corner_screws": 4
     },
     "wall_4x8_2x6_24oc": {
-      "studs": 4,
-      "plates": 2,
       "osb_sheets": 1,
       "plate_length_ft": 4,
       "stud_length_ft": 8,
       "nails_edge": 26,
       "nails_center": 12,
-      "corner_screws": 4,
-      "notes": "4 studs (2 end + 2 interior at 24\" OC), 2 plates, 1 OSB sheet."
+      "corner_screws": 4
     },
     "wall_3x8.5_2x6_16oc": {
-      "studs": 4,
-      "plates": 2,
       "osb_sheets": 1,
       "plate_length_ft": 3,
       "stud_length_ft": 8.5,
       "nails_edge": 22,
       "nails_center": 12,
-      "corner_screws": 4,
-      "notes": "4 studs (2 end + 2 interior at 16\" OC), 2 plates, 1 OSB sheet (trimmed to 3' width)."
+      "corner_screws": 4
     },
     "iwall_4x8_2x4_16oc": {
-      "studs": 5,
-      "plates": 2,
       "osb_sheets": 0,
       "plate_length_ft": 4,
       "stud_length_ft": 8,
       "lumber_type": "2x4",
       "nails_edge": 20,
       "nails_center": 14,
-      "corner_screws": 4,
-      "notes": "Interior wall. 5 studs (2 end + 3 interior at 16\" OC), 2 plates, no OSB."
+      "corner_screws": 4
     },
     "iwall_4x8_2x4_24oc": {
-      "studs": 4,
-      "plates": 2,
       "osb_sheets": 0,
       "plate_length_ft": 4,
       "stud_length_ft": 8,
       "lumber_type": "2x4",
       "nails_edge": 20,
       "nails_center": 10,
-      "corner_screws": 4,
-      "notes": "Interior wall. 4 studs (2 end + 2 interior at 24\" OC), 2 plates, no OSB."
+      "corner_screws": 4
     },
     "iwall_3x8.5_2x4_single": {
-      "studs": 3,
-      "plates": 2,
       "osb_sheets": 0,
       "plate_length_ft": 3,
       "stud_length_ft": 8.5,
       "lumber_type": "2x4",
       "nails_edge": 16,
       "nails_center": 8,
-      "corner_screws": 4,
-      "notes": "Interior wall. 3 studs (2 end + 1 center), 2 plates, no OSB."
+      "corner_screws": 4
     },
     "window_4x9_2x6_36x48": {
-      "studs": 6,
-      "plates": 2,
       "osb_sheets": 1,
       "plate_length_ft": 4,
       "stud_length_ft": 9,
       "nails_edge": 26,
       "nails_center": 18,
-      "corner_screws": 4,
-      "notes": "9' exterior window aperture, 36x48 RO. Same framing as 8' variant, taller studs."
+      "corner_screws": 4
     },
     "window_4x10_2x6_36x48": {
-      "studs": 6,
-      "plates": 2,
       "osb_sheets": 1,
       "plate_length_ft": 4,
       "stud_length_ft": 10,
       "nails_edge": 26,
       "nails_center": 18,
-      "corner_screws": 4,
-      "notes": "10' exterior window aperture, 36x48 RO. Same framing as 8' variant, taller studs."
+      "corner_screws": 4
     },
     "window_4x8_2x6_36x48": {
-      "studs": 6,
-      "plates": 2,
       "osb_sheets": 1,
       "plate_length_ft": 4,
       "stud_length_ft": 8,
       "nails_edge": 24,
       "nails_center": 16,
-      "corner_screws": 4,
-      "notes": "Exterior window aperture, 36x48 RO, sill 24\". Stud count is a full-stud-equivalent estimate: 2 kings + 2 jacks + cripples + sill, plus a doubled 2x8 header (cut from stud stock). 2 plates, 1 OSB sheet (opening cut on install)."
+      "corner_screws": 4
     },
     "door_4x8_2x6_38x83": {
-      "studs": 5,
-      "plates": 2,
       "osb_sheets": 1,
       "plate_length_ft": 4,
       "stud_length_ft": 8,
       "nails_edge": 24,
       "nails_center": 12,
-      "corner_screws": 4,
-      "notes": "Exterior door aperture, 38x83 RO to floor. Stud-equivalent estimate: 2 kings + 2 jacks + cripples, doubled 2x8 header. Bottom plate cut out at the opening. 1 OSB sheet (opening cut on install)."
+      "corner_screws": 4
     },
     "door_out_4x8_2x6_38x83": {
-      "studs": 5,
-      "plates": 2,
       "osb_sheets": 1,
       "plate_length_ft": 4,
       "stud_length_ft": 8,
       "nails_edge": 24,
       "nails_center": 12,
-      "corner_screws": 4,
-      "notes": "Exterior door (out-swing), same framing as door_4x8_2x6_38x83. Swing flag only."
+      "corner_screws": 4
     },
     "double_door_8x8_2x6_72x83": {
-      "studs": 8,
-      "plates": 2,
       "osb_sheets": 2,
       "plate_length_ft": 8,
       "stud_length_ft": 8,
       "nails_edge": 40,
       "nails_center": 20,
-      "corner_screws": 4,
-      "notes": "Double door, 8' panel, 72x83 RO. 2 kings + 2 jacks + cripples, doubled 2x12 header, 2 OSB sheets."
+      "corner_screws": 4
     },
     "sliding_8x8_2x6_72x80": {
-      "studs": 8,
-      "plates": 2,
       "osb_sheets": 2,
       "plate_length_ft": 8,
       "stud_length_ft": 8,
       "nails_edge": 40,
       "nails_center": 20,
-      "corner_screws": 4,
-      "notes": "Sliding patio door, 8' panel, 72x80 RO. Same framing as double door. Doubled 2x12 header."
+      "corner_screws": 4
     },
     "garage_9x8_2x6_96x84": {
-      "studs": 6,
-      "plates": 2,
       "osb_sheets": 3,
       "plate_length_ft": 9,
       "stud_length_ft": 8,
       "nails_edge": 40,
       "nails_center": 16,
-      "corner_screws": 4,
-      "notes": "Garage door, 9' panel, 96x84 RO. 2 kings + 2 jacks + cripples, doubled 2x12 header. 3 OSB sheets (trimmed)."
+      "corner_screws": 4
     },
     "idoor_4x8_2x4_38x83": {
-      "studs": 5,
-      "plates": 2,
       "osb_sheets": 0,
       "plate_length_ft": 4,
       "stud_length_ft": 8,
       "lumber_type": "2x4",
       "nails_edge": 20,
       "nails_center": 10,
-      "corner_screws": 4,
-      "notes": "Interior door aperture, 38x83 RO (matches Seh2 8ft interior door). 2 kings + 2 jacks + cripples + single 2x4 header (non-bearing). Bottom plate cut out at the opening. No OSB."
+      "corner_screws": 4
     }
   }
 }
