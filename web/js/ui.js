@@ -15,6 +15,7 @@ import { markModelChanged, requestDraw } from './app.js';
 import { setViewport, resize3d } from './render3d.js';
 import { exportJSON, saveLayout, loadLayout } from './io.js';
 import { exportFcstd } from './fcstd.js';
+import { exportFabDrawings } from './render_fab.js';
 
 const canvas = document.getElementById('design-canvas');
 
@@ -449,6 +450,7 @@ export function initUI() {
   document.getElementById('btn-save').addEventListener('click', saveLayout);
   document.getElementById('btn-export').addEventListener('click', exportJSON);
   document.getElementById('btn-export-fcstd').addEventListener('click', exportFcstd);
+  document.getElementById('btn-export-fab').addEventListener('click', exportFabDrawings);
   document.getElementById('btn-load').addEventListener('click',
     () => document.getElementById('load-input').click());
   document.getElementById('load-input').addEventListener('change', loadLayout);
