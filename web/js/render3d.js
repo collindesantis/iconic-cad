@@ -32,7 +32,7 @@ const matIWallLumber = new THREE.MeshLambertMaterial({ color: 0xc4a882 });
 export function init3d() {
   const previewContainer = document.getElementById('preview-container');
   renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setSize(196, 196);
+  renderer.setSize(236, 236);
   renderer.setClearColor(0x111828);
   previewContainer.appendChild(renderer.domElement);
 
@@ -149,7 +149,7 @@ export function setViewport(tab) {
   } else {
     const prev = document.getElementById('preview-container');
     prev.appendChild(el);
-    renderer.setSize(196, 196);
+    renderer.setSize(236, 236);
     camera.aspect = 1;
     camera.updateProjectionMatrix();
     renderOnce();

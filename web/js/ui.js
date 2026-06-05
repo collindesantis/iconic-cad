@@ -157,7 +157,11 @@ function buildLibMode() {
   el.innerHTML = '';
 
   const wrap = document.createElement('div');
-  wrap.style.cssText = 'display:flex; align-items:center; gap:6px; padding:4px 0 6px;';
+  wrap.style.cssText = 'display:flex; align-items:center; justify-content:flex-end; gap:6px; padding:2px 0 8px; width:100%;';
+
+  const label = document.createElement('span');
+  label.textContent = 'Legacy';
+  label.style.cssText = 'font-size:11px; color:#667; font-weight:bold; letter-spacing:1px;';
 
   const toggle = document.createElement('button');
   toggle.className = 'panel-toggle' + (ui.libMode === 'icons' ? ' active' : '');
@@ -169,12 +173,8 @@ function buildLibMode() {
     buildSidebar();
   });
 
-  const label = document.createElement('span');
-  label.textContent = 'Legacy';
-  label.style.cssText = 'font-size:11px; color:#667; font-weight:bold; letter-spacing:1px;';
-
-  wrap.appendChild(toggle);
   wrap.appendChild(label);
+  wrap.appendChild(toggle);
   el.appendChild(wrap);
 }
 
