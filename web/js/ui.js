@@ -151,22 +151,31 @@ function buildIconLibrary(lib) {
   addApertureSection('INTERIOR DOORS', INT_APERTURE_MODULES);
 }
 
-// ---- Library mode toggle (Iso | Icons) --------------------------------------
+// ---- Library mode toggle (Iso 3D default; Icons = "legacy") -----------------
 function buildLibMode() {
   const el = document.getElementById('lib-mode');
   el.innerHTML = '';
-  for (const [mode, label] of [['iso', 'Iso 3D'], ['icons', 'Icons']]) {
-    const b = document.createElement('button');
-    b.textContent = label;
-    b.classList.toggle('active', ui.libMode === mode);
-    b.addEventListener('click', () => {
-      ui.libMode = mode;
-      try { localStorage.setItem('iconic.libMode', mode); } catch (e) { /* ignore */ }
-      buildLibMode();
-      buildSidebar();
-    });
-    el.appendChild(b);
-  }
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex; align-items:center; gap:6px; padding:4px 0 6px;';
+
+  const toggle = document.createElement('button');
+  toggle.className = 'panel-toggle' + (ui.libMode === 'icons' ? ' active' : '');
+  toggle.innerHTML = '<span class="tgl-off"></span><span class="tgl-on"></span>';
+  toggle.addEventListener('click', () => {
+    ui.libMode = ui.libMode === 'iso' ? 'icons' : 'iso';
+    try { localStorage.setItem('iconic.libMode', ui.libMode); } catch (e) { /* ignore */ }
+    buildLibMode();
+    buildSidebar();
+  });
+
+  const label = document.createElement('span');
+  label.textContent = 'Legacy';
+  label.style.cssText = 'font-size:11px; color:#667; font-weight:bold; letter-spacing:1px;';
+
+  wrap.appendChild(toggle);
+  wrap.appendChild(label);
+  el.appendChild(wrap);
 }
 
 // ---- NESW direction selector (top-left of grid) -----------------------------
