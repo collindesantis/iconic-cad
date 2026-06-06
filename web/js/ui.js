@@ -438,6 +438,8 @@ const HOTKEYS = [
 
 function wireHotkeys() {
   document.addEventListener('keydown', (e) => {
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     for (const hk of HOTKEYS) {
       if (e.key.toLowerCase() === hk.key.toLowerCase() &&
           !!e.ctrlKey === hk.ctrl &&
