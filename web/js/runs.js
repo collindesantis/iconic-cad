@@ -39,21 +39,10 @@ function makeRun(line, chain) {
   };
 }
 
-// entities -> ordered, lettered runs with tagged modules.
-export function computeRuns(entities) {
-  const walls = entities.filter(e => e.kind === 'wall' || e.kind === 'iwall');
-  const feats = walls.map(e => {
-    const bb = getModuleBBox(e.mod, e.dir);
-    const horiz = isHorizontal(e.dir);
-    const x0 = e.x_mm, y0 = e.y_mm, x1 = x0 + bb.w, y1 = y0 + bb.h;
-    return {
-      e, horiz, x0, y0, x1, y1,
-      cross: horiz ? y0 : x0,           // the fixed coordinate of the wall line
-      a0: horiz ? x0 : y0,              // start along the run axis
-      a1: horiz ? x1 : y1,             // end along the run axis
-    };
-  });
-
+// Detect the runs within a single level's feature list: cluster into collinear
+// lines, then split each line into contiguous chains. Returns UNLETTERED runs
+// already sorted top-to-bottom (minY), ties left-to-right (minX).
+function detectRunsForLevel(feats) {
   // 1. cluster features into collinear lines (same orientation + cross band)
   const lines = [];
   for (const ft of feats) {
@@ -75,13 +64,46 @@ export function computeRuns(entities) {
     if (chain.length) runs.push(makeRun(L, chain));
   }
 
-  // 3. DETERMINISTIC ORDER + LETTERING: sort runs top-to-bottom (minY), ties
-  //    left-to-right (minX); letter A, B, C… in that order.
+  // 3. deterministic order within the level: top-to-bottom (minY), ties left-
+  //    to-right (minX).
   runs.sort((a, b) => a.minY - b.minY || a.minX - b.minX);
+  return runs;
+}
+
+// entities -> ordered, lettered runs with tagged modules.
+// Multi-level: entities are partitioned by `level` and processed in ascending
+// level order (L1, then L2, …). Lettering runs CONTINUOUSLY across levels with
+// a running index that does NOT reset — L1 → A,B,C; L2 → D,E,F… — so the letters
+// are globally unique (no level prefix). Entities without an explicit level fall
+// back to 'L1', so single-level callers are unaffected.
+export function computeRuns(entities) {
+  const walls = entities.filter(e => e.kind === 'wall' || e.kind === 'iwall');
+  const levelOf = e => e.level || 'L1';
+  const levelIds = [...new Set(walls.map(levelOf))].sort((a, b) => a.localeCompare(b));
+
+  const runs = [];
+  for (const lvl of levelIds) {
+    const feats = walls.filter(e => levelOf(e) === lvl).map(e => {
+      const bb = getModuleBBox(e.mod, e.dir);
+      const horiz = isHorizontal(e.dir);
+      const x0 = e.x_mm, y0 = e.y_mm, x1 = x0 + bb.w, y1 = y0 + bb.h;
+      return {
+        e, horiz, x0, y0, x1, y1,
+        cross: horiz ? y0 : x0,           // the fixed coordinate of the wall line
+        a0: horiz ? x0 : y0,              // start along the run axis
+        a1: horiz ? x1 : y1,             // end along the run axis
+      };
+    });
+    const lvlRuns = detectRunsForLevel(feats);
+    for (const r of lvlRuns) r.level = lvl;
+    runs.push(...lvlRuns);
+  }
+
+  // CONTINUOUS LETTERING across levels — running index never resets.
   runs.forEach((r, i) => { r.letter = String.fromCharCode(65 + i); });
 
-  // 4. tag + position string per module (module order = world X for horizontal
-  //    runs, world Y for vertical — already sorted in step 2).
+  // tag + position string per module (module order = world X for horizontal
+  // runs, world Y for vertical — already sorted in detectRunsForLevel).
   for (const r of runs) {
     r.modules.forEach((m, i) => {
       m.tag = `${r.letter}-${i + 1}`;

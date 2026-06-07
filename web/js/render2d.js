@@ -7,6 +7,7 @@ import { doc, ui, view } from './state.js';
 import { mmToPx } from './view.js';
 import { isHorizontal, getModuleBBox, getPortPositions } from './geometry.js';
 import { IN_TO_MM, APERTURE_GAP } from './constants.js';
+import { regionForLevel } from './region.js';
 
 const canvas = document.getElementById('design-canvas');
 const ctx = canvas.getContext('2d');
@@ -121,8 +122,28 @@ function leafSweepCCW(a0, a1) {
   return d < 0;
 }
 
+// Faint, non-interactive footprint of an L1 wall, shown under the L2 plan as a
+// ghost (not selectable / not eraseable while on L2 — §4).
+function drawGhost(p) {
+  const bb = getModuleBBox(p.mod, p.dir);
+  const px = view.offsetX + mmToPx(p.x_mm);
+  const py = view.offsetY + mmToPx(p.y_mm);
+  const pw = mmToPx(bb.w), ph = mmToPx(bb.h);
+  ctx.save();
+  ctx.fillStyle = 'rgba(120,140,170,0.10)';
+  ctx.strokeStyle = 'rgba(120,150,190,0.35)';
+  ctx.lineWidth = 1;
+  ctx.fillRect(px, py, pw, ph);
+  ctx.strokeRect(px, py, pw, ph);
+  ctx.restore();
+}
+
 export function draw2d() {
   const placed = doc.entities;
+  const onL2 = doc.activeLevel === 'L2';
+  // Only the active level's entities are drawn solid + interactive; other levels
+  // appear (if at all) as ghosts. New placements land on doc.activeLevel.
+  const activeEnts = placed.filter(p => p.level === doc.activeLevel);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // Background grid
@@ -136,8 +157,19 @@ export function draw2d() {
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
   }
 
-  // Draw placed modules
-  placed.forEach((p) => {
+  // On L2: the L1 build region (gray filled standin) under faint L1 ghosts.
+  if (onL2) {
+    const region = regionForLevel('L1');
+    ctx.fillStyle = 'rgba(150,156,172,0.18)';
+    for (const r of region.rects) {
+      ctx.fillRect(view.offsetX + mmToPx(r.x_mm), view.offsetY + mmToPx(r.y_mm),
+                   mmToPx(r.w_mm), mmToPx(r.h_mm));
+    }
+    for (const p of placed) if (p.level === 'L1') drawGhost(p);
+  }
+
+  // Draw active-level modules
+  activeEnts.forEach((p) => {
     const bb = getModuleBBox(p.mod, p.dir);
     const px = view.offsetX + mmToPx(p.x_mm);
     const py = view.offsetY + mmToPx(p.y_mm);
@@ -247,6 +279,21 @@ export function draw2d() {
     ctx.lineWidth = 1;
     ctx.fillRect(ui.mouseCanvasX - pw/2, ui.mouseCanvasY - ph/2, pw, ph);
     ctx.strokeRect(ui.mouseCanvasX - pw/2, ui.mouseCanvasY - ph/2, pw, ph);
+  }
+
+  // Red-flag rejection feedback (e.g. an off-region L2 drop — §5). Transient;
+  // ui.rejectFlash is cleared on a timer by the caller that set it.
+  if (ui.rejectFlash) {
+    const { x, y } = ui.rejectFlash;
+    ctx.save();
+    ctx.strokeStyle = '#e53935';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, y, 16, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x - 9, y - 9); ctx.lineTo(x + 9, y + 9);
+    ctx.moveTo(x + 9, y - 9); ctx.lineTo(x - 9, y + 9);
+    ctx.stroke();
+    ctx.restore();
   }
 
   // Status

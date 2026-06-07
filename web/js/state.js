@@ -51,6 +51,24 @@ export const doc = {
   entities: [], // was `placed`
 };
 
+// ---- Second-story level construction -------------------------------------
+// Floor-to-floor rise (L1 base z=0 → L2 base z). This is the ONE allowed
+// hardcoded geometry constant for the second-story feature (spec §2):
+// 1st-floor wall + double top plate + bearing gap + 2×12 joist depth +
+// ¾" subfloor. Refined later by the flooring/height features — not engineered.
+export const FLOOR_TO_FLOOR_MM = 3095.63;
+
+// Create Level 2 on demand. Idempotent. ONLY when the project is 2-story — the
+// Project Options page deliberately writes `stories` intent but does NOT create
+// doc.levels[1]; that is this feature's job. Called on first switch to L2 and on
+// load when stories === 2 (so older 2-story files without an explicit L2 gain
+// one). No demote path exists, so there is no inverse / cleanup.
+export function ensureLevel2() {
+  if (doc.project.stories !== 2) return;
+  if (doc.levels.some(l => l.id === 'L2')) return;
+  doc.levels.push({ id: 'L2', name: 'Level 2', z_mm: FLOOR_TO_FLOOR_MM });
+}
+
 // ---- View (camera over the 2D plan) --------------------------------------
 export const view = {
   zoom: ZOOM_DEFAULT, // PX_PER_MM
@@ -71,6 +89,7 @@ export const ui = {
   panStartY: 0,
   nextId: 0,
   activeTab: '2d',     // '2d' | '3d'
+  rejectFlash: null,   // { x, y } canvas px — transient red flag for a rejected L2 drop
   placeDir: 'north',   // direction applied to a module picked in iso-library mode
   libMode: 'iso',      // 'iso' (one thumbnail + NESW selector) | 'icons' (4 per module)
   libCategory: 'walls', // library tab: 'walls' | 'windows' | 'doors' | 'interior'

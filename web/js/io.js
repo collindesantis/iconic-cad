@@ -3,7 +3,7 @@
 // The exported JSON is the contract shared with the compiler and any future
 // backend, so it carries the orthogonal attributes (level, layer) per entity.
 // =====================================================
-import { doc, ui } from './state.js';
+import { doc, ui, ensureLevel2 } from './state.js';
 import { ALL_MODULES } from './constants.js';
 import { markModelChanged } from './app.js';
 
@@ -71,6 +71,14 @@ export function loadLayout(event) {
         seismic_class: dc.seismic_class ?? 'B',
       },
     };
+    // Levels round-trip: restore the saved stack (so L2 + its z_mm reload), then
+    // ensureLevel2() so an older 2-story file without an explicit L2 still gains
+    // one (§9). Falls back to the single default level for legacy files.
+    if (Array.isArray(data.levels) && data.levels.length) {
+      doc.levels = data.levels;
+    }
+    ensureLevel2();
+
     // Accept v2 (entities) or legacy flat (modules) format.
     const list = data.entities || data.modules || [];
     doc.entities.length = 0;
@@ -94,6 +102,8 @@ export function loadLayout(event) {
       ui.nextId++;
     }
     markModelChanged();
+    // Refresh the floor switcher (it appears for 2-story loads).
+    window.dispatchEvent(new Event('iconic:project'));
   };
   reader.readAsText(file);
   event.target.value = '';

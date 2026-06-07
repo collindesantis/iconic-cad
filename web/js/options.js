@@ -99,6 +99,8 @@ function onGo() {
 
   _confirmed = true;
   document.getElementById('options-modal').classList.remove('open');
+  // Tell the UI the project intent is set (the floor switcher shows for 2-story).
+  window.dispatchEvent(new Event('iconic:project'));
 }
 
 // ---------------------------------------------------------------------------

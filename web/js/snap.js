@@ -28,6 +28,7 @@ export function findSnap(cursorX_mm, cursorY_mm, mod, dir) {
 
   // Check each placed module's ports against drag module's ports
   for (const p of placed) {
+    if (p.level !== doc.activeLevel) continue; // never snap across levels (L2↔L1)
     // Interior walls attach to exterior walls only via T-junction (which makes a
     // real connection + blocking) — never by corner port-snap, which would place
     // them flush-but-off-centre with no bolting framing.
@@ -82,6 +83,25 @@ export function findSnap(cursorX_mm, cursorY_mm, mod, dir) {
     }
   }
 
+  // STACK SNAP: an exterior wall on an upper level snaps directly on top of the
+  // Story-1 exterior wall beneath the cursor (same origin = exactly above it), so
+  // stacking one wall over another is easy. Competes with same-level port snaps
+  // by cursor distance; the region gate still rejects any overhang on drop.
+  if (doc.activeLevel !== 'L1' && !mod.interior) {
+    let bestStack = null, bestStackD = Infinity;
+    for (const p of placed) {
+      if (p.level === doc.activeLevel) continue; // a wall on the level BELOW
+      if (p.kind !== 'wall') continue;           // exterior only
+      const pbb = getModuleBBox(p.mod, p.dir);
+      const cx = p.x_mm + pbb.w / 2, cy = p.y_mm + pbb.h / 2;
+      const d = Math.hypot(mmToPx(cx - cursorX_mm), mmToPx(cy - cursorY_mm));
+      if (d < bestStackD) { bestStackD = d; bestStack = { x_mm: p.x_mm, y_mm: p.y_mm }; }
+    }
+    if (bestStack && bestStackD < SNAP_DIST_PX * 6 && (!bestSnap || bestStackD < bestDist)) {
+      return bestStack;
+    }
+  }
+
   return bestSnap;
 }
 
@@ -90,6 +110,7 @@ export function wouldOverlap(x, y, bb, mod, dir) {
   // but reject large overlaps (module stacking on top of each other)
   const maxAllowed = WALL_DEPTH * WALL_DEPTH * 1.5; // ~D² with some tolerance
   for (const p of placed) {
+    if (p.level !== doc.activeLevel) continue; // L2 stacks over L1 — only same-level overlap counts
     const pbb = getModuleBBox(p.mod, p.dir);
     const overlapW = Math.min(x + bb.w, p.x_mm + pbb.w) - Math.max(x, p.x_mm);
     const overlapH = Math.min(y + bb.h, p.y_mm + pbb.h) - Math.max(y, p.y_mm);
@@ -381,6 +402,7 @@ function findTJunctionSnap(cursorX_mm, cursorY_mm, mod, dir) {
   let bestSnap = null;
 
   for (const p of placed) {
+    if (p.level !== doc.activeLevel) continue; // never T-junction across levels
     const pIsH = isHorizontal(p.dir);
     if (dragIsH === pIsH) continue;
 

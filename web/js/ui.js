@@ -3,7 +3,7 @@
 // All DOM wiring lives here; initUI() attaches listeners (module scope means
 // no inline onclick, so buttons are wired by id).
 // =====================================================
-import { doc, ui, view, history, future } from './state.js';
+import { doc, ui, view, history, future, ensureLevel2 } from './state.js';
 import {
   MODULES, INTERIOR_MODULES, APERTURE_MODULES, INT_APERTURE_MODULES,
   DIRECTIONS, ROTATE_CW, DIR_COLORS, ZOOM_MIN, ZOOM_MAX, ZOOM_STEP,
@@ -11,6 +11,7 @@ import {
 import { getModuleBBox } from './geometry.js';
 import { mmToPx, pxToMm } from './view.js';
 import { findSnap } from './snap.js';
+import { regionForLevel } from './region.js';
 import { markModelChanged, requestDraw } from './app.js';
 import { setViewport, resize3d, set3dPreviewEnabled } from './render3d.js';
 import { cardHover, cardLeave } from './card_preview3d.js';
@@ -242,8 +243,31 @@ function clearAll() {
   markModelChanged();
 }
 
+// Robust removal of ALL Level-2 entities + their undo/redo history. Used when a
+// Story-1 edit is about to change the floor silhouette the L2 walls stand on —
+// rather than leave orphaned / overhanging L2 walls, clear Story 2 wholesale.
+export function clearLevel2() {
+  for (let i = doc.entities.length - 1; i >= 0; i--) {
+    if (doc.entities[i].level === 'L2') doc.entities.splice(i, 1);
+  }
+  const isL2 = a => a.module && a.module.level === 'L2';
+  for (let i = history.length - 1; i >= 0; i--) if (isL2(history[i])) history.splice(i, 1);
+  for (let i = future.length - 1; i >= 0; i--) if (isL2(future[i])) future.splice(i, 1);
+}
+
 function undoLast() {
   if (history.length === 0) return;
+  // GUARD: undoing a Story-1 EXTERIOR wall while Story-2 walls exist would change
+  // the floor silhouette they sit on. Confirm; on yes, clear Story 2 and drop back
+  // to Story 1 so the undo lands where the user can see it. Interior (iwall) and
+  // L2 actions don't affect the silhouette, so they undo freely.
+  const top = history[history.length - 1];
+  const topIsL1Exterior = top.module && top.module.kind === 'wall' && (top.module.level || 'L1') === 'L1';
+  if (topIsL1Exterior && doc.entities.some(e => e.level === 'L2')) {
+    if (!confirm('Undoing Story 1 will clear ALL Story 2 walls. Continue?')) return;
+    clearLevel2();
+    if (doc.activeLevel === 'L2') { doc.activeLevel = 'L1'; refreshFloorSwitch(); }
+  }
   const action = history.pop();
   if (action.type === 'place') {
     const idx = doc.entities.indexOf(action.module);
@@ -296,6 +320,7 @@ function findModuleAt(px_x, px_y) {
   const my = pxToMm(px_y - view.offsetY);
   for (let i = doc.entities.length - 1; i >= 0; i--) {
     const p = doc.entities[i];
+    if (p.level !== doc.activeLevel) continue; // only active level — L1 ghosts on L2 are not eraseable
     const bb = getModuleBBox(p.mod, p.dir);
     if (mx >= p.x_mm && mx <= p.x_mm + bb.w &&
         my >= p.y_mm && my <= p.y_mm + bb.h) {
@@ -303,6 +328,72 @@ function findModuleAt(px_x, px_y) {
     }
   }
   return -1;
+}
+
+// =====================================================
+// FLOOR SWITCHER (second story)
+// Pill toggle overlaid top-right on the build grid. Shown ONLY for 2-story
+// projects. LEVEL 2 is gated on Story 1 being a closed shell (§3).
+// =====================================================
+let _warnTimer = null;
+
+// Show/hide + sync the pill to doc.activeLevel and doc.project.stories.
+export function refreshFloorSwitch() {
+  const sw = document.getElementById('floor-switch');
+  if (!sw) return;
+  const twoStory = doc.project.stories === 2;
+  sw.style.display = twoStory ? '' : 'none';
+  if (!twoStory) return;
+  const pill = document.getElementById('floor-pill');
+  const l1 = document.getElementById('floor-l1');
+  const l2 = document.getElementById('floor-l2');
+  const onL2 = doc.activeLevel === 'L2';
+  pill.dataset.pos = onL2 ? 'right' : 'left';
+  l1.classList.toggle('active', !onL2);
+  l2.classList.toggle('active', onL2);
+}
+
+// Briefly flash the gate warning under the pill, then fade it.
+function flashStoryWarn() {
+  const warn = document.getElementById('floor-warn');
+  if (!warn) return;
+  warn.classList.add('show');
+  clearTimeout(_warnTimer);
+  _warnTimer = setTimeout(() => warn.classList.remove('show'), 1800);
+}
+
+// setActiveLevel — update the active level and refresh views. markModelChanged
+// rebuilds 3D (region plane / both-story Z) and redraws the 2D plan. (Lives here,
+// not in state.js, to avoid a state→app import cycle; see spec §2 note.)
+function setActiveLevel(levelId) {
+  doc.activeLevel = levelId;
+  refreshFloorSwitch();
+  markModelChanged();
+}
+
+function wireFloorSwitch() {
+  document.getElementById('floor-l1')?.addEventListener('click', () => {
+    if (doc.activeLevel !== 'L1') setActiveLevel('L1'); // always switchable back
+  });
+  document.getElementById('floor-l2')?.addEventListener('click', () => {
+    if (doc.activeLevel === 'L2') return;
+    // GATE: Story 1 must be a closed shell before you can frame Story 2.
+    if (!regionForLevel('L1').isEnclosed) { flashStoryWarn(); return; }
+    ensureLevel2();
+    setActiveLevel('L2');
+  });
+  // Reflect project changes (Options GO / load) without a model edit.
+  window.addEventListener('iconic:project', refreshFloorSwitch);
+  refreshFloorSwitch();
+}
+
+// Brief red-flag flash at a canvas point for a rejected placement (§5).
+let _rejectTimer = null;
+function flashReject(cx, cy) {
+  ui.rejectFlash = { x: cx, y: cy };
+  requestDraw();
+  clearTimeout(_rejectTimer);
+  _rejectTimer = setTimeout(() => { ui.rejectFlash = null; requestDraw(); }, 450);
 }
 
 // =====================================================
@@ -403,10 +494,20 @@ function wireCanvas() {
       const mx = pxToMm((e.clientX - rect.left) - view.offsetX);
       const my = pxToMm((e.clientY - rect.top) - view.offsetY);
 
+      const onL2 = doc.activeLevel === 'L2';
       let pos = ui.snapTarget;
-      if (!pos && doc.entities.length === 0) {
+      // Free placement at cursor when nothing snaps: the empty canvas, or on L2
+      // (where the only placed walls may be the non-interactive L1 ghosts).
+      if (!pos && (doc.entities.length === 0 || onL2)) {
         const bb = getModuleBBox(ui.dragState.mod, ui.dragState.dir);
         pos = { x_mm: mx - bb.w / 2, y_mm: my - bb.h / 2 };
+      }
+      // L2 GATE: a new L2 module must sit entirely inside the L1 build region.
+      // Off-region drops are REJECTED with the red-flag feedback (§5).
+      if (pos && onL2 &&
+          !regionForLevel('L1').containsFootprint(ui.dragState.mod, ui.dragState.dir, pos.x_mm, pos.y_mm)) {
+        flashReject(ui.mouseCanvasX, ui.mouseCanvasY);
+        return;
       }
       if (pos) {
         const entity = {
@@ -482,6 +583,7 @@ export function initUI() {
   buildLibTabs();
   buildSidebar();
   wireCanvas();
+  wireFloorSwitch();
   wireHotkeys();
 
   // Save Work — one-click download of the current layout.

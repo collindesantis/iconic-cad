@@ -155,6 +155,39 @@ body { font-family: 'Space Mono', 'Courier New', monospace; display: flex; heigh
   cursor: crosshair;
 }
 
+/* Floor switcher (top-right of canvas) — same pill family as .opt-pill */
+#floor-switch {
+  position: absolute; top: 8px; right: 8px;
+  z-index: 10; text-align: center;
+}
+.floor-pill {
+  position: relative; display: inline-flex;
+  background: #0f1830; border: 1px solid #3a5a8a;
+  border-radius: 8px; padding: 3px;
+}
+.floor-pill-thumb {
+  position: absolute; top: 3px; bottom: 3px; left: 3px;
+  width: calc(50% - 3px);
+  background: #2e7d32; border-radius: 6px;
+  box-shadow: 0 0 8px rgba(76,195,247,0.25);
+  transition: transform 0.18s ease; pointer-events: none;
+}
+.floor-pill[data-pos="right"] .floor-pill-thumb { transform: translateX(100%); }
+.floor-pill button {
+  position: relative; z-index: 1; border: none; background: transparent;
+  color: #8a93a8; font-size: 12px; font-weight: bold; letter-spacing: 1px;
+  padding: 7px 16px; border-radius: 6px; cursor: pointer;
+  font-family: 'Space Mono', 'Courier New', monospace;
+  transition: color 0.18s ease;
+}
+.floor-pill button.active { color: #fff; }
+#floor-warn {
+  margin-top: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.4px;
+  color: #ff5252; opacity: 0; transition: opacity 0.18s ease;
+  pointer-events: none;
+}
+#floor-warn.show { opacity: 1; }
+
 /* Toolbar (top-left of canvas) */
 #toolbar {
   position: absolute;
@@ -611,6 +644,16 @@ body { font-family: 'Space Mono', 'Courier New', monospace; display: flex; heigh
       <button id="btn-rotate" style="display:none;">&#x21BB; Rotate (R)</button>
     </div>
     <div id="dir-selector"></div>
+    <!-- Floor switcher — top-right overlay, shown only for 2-story projects (ui.js).
+         LEVEL 2 is gated on Story 1 being a closed shell. -->
+    <div id="floor-switch" style="display:none;">
+      <div class="floor-pill" id="floor-pill" data-pos="left">
+        <span class="floor-pill-thumb"></span>
+        <button type="button" id="floor-l1">LEVEL 1</button>
+        <button type="button" id="floor-l2">LEVEL 2</button>
+      </div>
+      <div id="floor-warn">You must fill out Story 1 first.</div>
+    </div>
     <div id="status">Click and drag modules from the library</div>
   </div>
   <div id="canvas3d-wrap"></div>

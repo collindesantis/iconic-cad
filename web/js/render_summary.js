@@ -87,12 +87,24 @@ function tileSVG(m, x, y) {
 }
 
 // ===================== PAGE 1 — MODULES BY RUN =====================
-export function summaryPage1(runs) {
+// Runs arrive already grouped by level then ordered within level (runs.js). When
+// the build spans >1 level a level title is emitted before each level's first
+// run, so page 1 reads "Level 1 / runs…, Level 2 / runs…" (§8).
+export function summaryPage1(runs, levelNames = {}) {
   const SVW = 1000, PER_ROW = 4, PITCH = 192, ROW_H = 206, RUN_GAP = 24;
   const body = [];
   let y = 130, modCount = 0, totW = 0, totMin = 0;
   const designs = new Set();
+  const multiLevel = new Set(runs.map(r => r.level || 'L1')).size > 1;
+  let curLevel = null;
   for (const r of runs) {
+    const lvl = r.level || 'L1';
+    if (multiLevel && lvl !== curLevel) {
+      curLevel = lvl;
+      y += 8;
+      body.push(`<text x="40" y="${f2(y)}" class="ink" font-size="13" font-weight="700" letter-spacing="1">${esc((levelNames[lvl] || lvl).toUpperCase())}</text>`);
+      y += 22;
+    }
     body.push(`<text x="40" y="${f2(y)}" class="sec">RUN ${r.letter} <tspan class="faint" letter-spacing="0" font-size="9"> — ${r.modules.length} module${r.modules.length === 1 ? '' : 's'} · ${r.horiz ? 'left → right' : 'top → bottom'}</tspan></text>`);
     body.push(`<line x1="40" y1="${f2(y + 6)}" x2="960" y2="${f2(y + 6)}" stroke="#d8d2c6" stroke-width=".8"/>`);
     y += 20;
@@ -124,7 +136,9 @@ export function summaryPage1(runs) {
 }
 
 // ===================== PAGE 2 — IN-PLACE MAP =====================
-export function summaryPage2(runs, entities) {
+// One map per level (§8). `entities` is already filtered to the level; `runs` is
+// the whole-build run set (tagsByEntityId gives the same tags the run pages use).
+export function summaryPage2(runs, entities, levelLabel = null) {
   const SVW = 900, SVH = 680;
   const walls = entities.filter(e => e.kind === 'wall' || e.kind === 'iwall');
   const tagMap = tagsByEntityId(runs);
@@ -133,7 +147,7 @@ export function summaryPage2(runs, entities) {
   p.push(`<defs><style>${SHEET_CSS}.tag{font-size:11px;font-weight:700;fill:#14110c}</style></defs>`);
   p.push(`<rect x="0" y="0" width="${SVW}" height="${SVH}" fill="#ffffff"/>`);
   p.push(`<rect x="12" y="12" width="${SVW - 24}" height="${SVH - 24}" fill="none" stroke="#d8d2c6" stroke-width="1"/>`);
-  p.push(`<text x="40" y="46" class="ink" font-size="19" font-weight="700" letter-spacing=".5">BUILD MAP · MODULES IN PLACE</text>`);
+  p.push(`<text x="40" y="46" class="ink" font-size="19" font-weight="700" letter-spacing=".5">BUILD MAP · MODULES IN PLACE${levelLabel ? ` · ${esc(levelLabel.toUpperCase())}` : ''}</text>`);
   p.push(`<text x="40" y="64" class="sub bsmono" font-size="11">page 2 · each module shown in its real position</text>`);
   p.push(`<line x1="40" y1="80" x2="${SVW - 40}" y2="80" stroke="#e6e0d4" stroke-width="1"/>`);
 
@@ -260,12 +274,28 @@ export async function generateBuildSummary(filename) {
 
   const templates = await loadCardTemplates();
   const runs = computeRuns(doc.entities);
+  const levelNames = Object.fromEntries(doc.levels.map(l => [l.id, l.name]));
+
+  // Levels that actually have wall entities, in doc order (Level 1 then Level 2).
+  const levelsWithWalls = doc.levels
+    .map(l => l.id)
+    .filter(id => walls.some(e => (e.level || 'L1') === id));
+  if (!levelsWithWalls.length) levelsWithWalls.push('L1'); // legacy: entities sans level
 
   const sheets = [
-    { label: 'Summary · Runs', title: null, fullpage: true, sections: [{ type: 'summary', svg: summaryPage1(runs) }] },
-    { label: 'Summary · Map', title: null, fullpage: true, sections: [{ type: 'map', svg: summaryPage2(runs, doc.entities) }] },
-    { label: 'Summary · Cut & Pick', title: null, fullpage: true, sections: [{ type: 'cutpick', svg: summaryPage3(doc.entities, templates) }] },
+    { label: 'Summary · Runs', title: null, fullpage: true, sections: [{ type: 'summary', svg: summaryPage1(runs, levelNames) }] },
   ];
+  // One in-place map per level that has entities, in order (§8).
+  for (const lvl of levelsWithWalls) {
+    const lvlEnts = doc.entities.filter(e => (e.level || 'L1') === lvl);
+    const label = levelsWithWalls.length > 1 ? (levelNames[lvl] || lvl) : null;
+    sheets.push({
+      label: label ? `Summary · Map · ${label}` : 'Summary · Map',
+      title: null, fullpage: true,
+      sections: [{ type: 'map', svg: summaryPage2(runs, lvlEnts, label) }],
+    });
+  }
+  sheets.push({ label: 'Summary · Cut & Pick', title: null, fullpage: true, sections: [{ type: 'cutpick', svg: summaryPage3(doc.entities, templates) }] });
 
   // one fab card per distinct design (deduped), referenced by the tiles' W-##.
   const seen = new Set(), reps = [];

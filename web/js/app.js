@@ -6,9 +6,11 @@
 import { draw2d } from './render2d.js';
 import { rebuildModel3D } from './render3d.js';
 import { updateBOM } from './bom.js';
+import { invalidateRegion } from './region.js';
 
 // Document mutated (place / erase / undo / redo / clear / load).
 export function markModelChanged() {
+  invalidateRegion(); // walls changed → drop the cached build region (before 3D rebuild reads it)
   updateBOM();
   rebuildModel3D();
   draw2d();

@@ -12,6 +12,8 @@ import * as THREE from 'three';
 import { doc } from './state.js';
 import { IN_TO_MM, STUD_DEPTH, OSB_THICK } from './constants.js';
 import { enumerateMembers } from './members.js';
+import { panelHeightMM } from './designs.js';
+import { regionForLevel } from './region.js';
 
 // One revolution every ~35 s at 60 fps.
 const DEFAULT_SPEED = 2 * Math.PI / (35 * 60);
@@ -148,7 +150,7 @@ function addBoxTo(group, sx, sy, sz, px, py, pz, mat) {
 // see members.js). Members are panel-local flat (x across width, z vertical);
 // this maps them into the scene by `dir`, choosing the OSB face side, exactly as
 // the old hand-written loops did. 3D output is identical by construction.
-export function buildWall3D(mod, dir, xPos, yPos) {
+export function buildWall3D(mod, dir, xPos, yPos, zPos = 0) {
   const group = new THREE.Group();
   const isInt = mod.interior;
   const D = isInt ? (3.5 * IN_TO_MM) : STUD_DEPTH;
@@ -174,6 +176,7 @@ export function buildWall3D(mod, dir, xPos, yPos) {
   if (dir === 'north') group.position.y = -(yPos + D + O);
   else if (dir === 'south') group.position.y = -(yPos + D);
   else group.position.y = -yPos;
+  group.position.z = zPos; // level base z (L1 = 0, L2 = FLOOR_TO_FLOOR_MM)
 
   return group;
 }
@@ -193,8 +196,43 @@ export function rebuildModel3D() {
 
   const minX = Math.min(...placed.map(p => p.x_mm));
   const minY = Math.min(...placed.map(p => p.y_mm));
+  // L2 sits directly on top of the Story-1 walls (no joist gap modelled yet): the
+  // L2 base Z = the tallest L1 wall top. Derived from the real L1 panels, not the
+  // doc floor-to-floor constant, so the standin floor + L2 walls land flush on
+  // the L1 top plate. (Refined when the flooring/height features add the gap.)
+  const l1Walls = placed.filter(p => (p.level || 'L1') === 'L1');
+  const l2BaseZ = l1Walls.length
+    ? Math.max(...l1Walls.map(p => panelHeightMM(enumerateMembers(p.mod)))) : 0;
+  const zForLevel = id => (id === 'L2' ? l2BaseZ : 0);
+  // Every level at its real Z: L1 walls at z=0, L2 walls flush on the L1 top (§6).
   for (const p of placed) {
-    modelRoot.add(buildWall3D(p.mod, p.dir, p.x_mm - minX, p.y_mm - minY));
+    modelRoot.add(buildWall3D(p.mod, p.dir, p.x_mm - minX, p.y_mm - minY, zForLevel(p.level)));
+  }
+
+  // L2 floor standin: a flat, transparent plane over the L1 build region at the
+  // L2 base Z (the L1 wall top) — the placeholder the user will later replace
+  // with real joists.
+  // ▸ FUTURE FLOORING SLOT: the flooring tab attaches real geometry + BOM here
+  //   (joists, rim, subfloor). Emit ONLY the transparent plane now — no solids,
+  //   no joists, no BOM. (§6 / §0)
+  const l2 = doc.levels.find(l => l.id === 'L2');
+  if (l2) {
+    const region = regionForLevel('L1');
+    if (region.isEnclosed) {
+      const planeMat = new THREE.MeshBasicMaterial({
+        color: 0x9aa4b8, transparent: true, opacity: 0.18,
+        side: THREE.DoubleSide, depthWrite: false,
+      });
+      for (const r of region.rects) {
+        const plane = new THREE.Mesh(new THREE.PlaneGeometry(r.w_mm, r.h_mm), planeMat);
+        plane.position.set(
+          r.x_mm - minX + r.w_mm / 2,
+          -(r.y_mm - minY + r.h_mm / 2), // scene Y is negated (see buildWall3D)
+          l2BaseZ,
+        );
+        modelRoot.add(plane);
+      }
+    }
   }
 
   const box    = new THREE.Box3().setFromObject(modelRoot);

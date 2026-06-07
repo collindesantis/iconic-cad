@@ -13,6 +13,7 @@
 import { ALL_MODULES, IN_TO_MM } from '../web/js/constants.js';
 import { enumerateMembers } from '../web/js/members.js';
 import { computeRuns, tagsByEntityId } from '../web/js/runs.js';
+import { computeRegion } from '../web/js/region.js';
 import { bayGapsMM, inFrac, designIdFor } from '../web/js/designs.js';
 import { cutListGrouped } from '../web/js/bom.js';
 import { cardSVG } from '../web/js/render_fab.js';
@@ -79,6 +80,83 @@ function fixture() {
   const b = computeRuns(fixture());
   const flat = rs => rs.flatMap(r => r.modules.map(m => `${m.tag}|${m.positionString}|${m.designId}`)).join(';');
   eq(flat(a), flat(b), 'computeRuns deterministic');
+}
+
+// ---- 1c. two-level: per-level partition + CONTINUOUS lettering (§7) ---------
+{
+  const std = mod('wall_4x8_2x6_16oc');
+  let n = 0;
+  const e = (m, dir, x, y, level) =>
+    ({ id: `w${n++}`, kind: 'wall', mod: m, dir, x_mm: x, y_mm: y, level });
+  // L1: 4 north (run) + 2 east (run) = A, B. L2: 2 north (one run) = C.
+  const ents = [
+    e(std, 'north', 0 * IN48, 0, 'L1'),
+    e(std, 'north', 1 * IN48, 0, 'L1'),
+    e(std, 'north', 2 * IN48, 0, 'L1'),
+    e(std, 'north', 3 * IN48, 0, 'L1'),
+    e(std, 'east', 4 * IN48, 0, 'L1'),
+    e(std, 'east', 4 * IN48, 1 * IN48, 'L1'),
+    e(std, 'north', 0 * IN48, 0, 'L2'),
+    e(std, 'north', 1 * IN48, 0, 'L2'),
+  ];
+  const runs = computeRuns(ents);
+  eq(runs.length, 3, 'three runs across two levels');
+  eq(runs.map(r => r.letter).join(','), 'A,B,C', 'continuous lettering A,B,C (no reset)');
+  eq(runs.map(r => r.level).join(','), 'L1,L1,L2', 'runs ordered L1, L1, L2');
+  eq(runs[2].modules.map(m => m.tag).join(','), 'C-1,C-2', 'L2 run continues as C-*');
+  // determinism with levels present
+  const flat = rs => rs.flatMap(r => r.modules.map(m => `${m.tag}|${r.level}`)).join(';');
+  eq(flat(computeRuns(ents)), flat(runs), 'two-level computeRuns deterministic');
+}
+
+// ---- 1d. region.js: pure flood-fill — rect, L-shape, open shell (§1) --------
+{
+  const std = mod('wall_4x8_2x6_16oc');
+  let n = 0;
+  const e = (dir, x, y) => ({ id: `r${n++}`, kind: 'wall', mod: std, dir, x_mm: x, y_mm: y });
+  const W = std.width_mm; // 48"
+
+  // closed 2×2 rectangular shell: N top, S bottom, W left, E right
+  const rect = [
+    e('north', 0, 0), e('north', W, 0),
+    e('south', 0, 2 * W), e('south', W, 2 * W),
+    e('west', 0, 0), e('west', 0, W),
+    e('east', 2 * W, 0), e('east', 2 * W, W),
+  ];
+  const rr = computeRegion(rect);
+  eq(rr.isEnclosed, true, 'closed rectangle is enclosed');
+  // the region is the FILLED silhouette: interior AND on-wall points are inside;
+  // a point far outside is not.
+  eq(rr.containsPoint(W, W), true, 'rect: interior point in region');
+  eq(rr.containsPoint(W, 1), true, 'rect: on-wall point in region (silhouette)');
+  eq(rr.containsPoint(-5 * W, -5 * W), false, 'rect: far-outside point not in region');
+  // a wall placed directly on top of an L1 wall (same footprint) is allowed;
+  // a wall hanging off the outside is rejected (overhang).
+  eq(rr.containsFootprint(std, 'north', 0, 0), true, 'rect: footprint on top of L1 wall allowed');
+  eq(rr.containsFootprint(std, 'north', -2 * W, 0), false, 'rect: overhanging footprint rejected');
+
+  // open shell: drop the right wall → flood leaks in → not enclosed
+  const open = rect.filter(w => w.dir !== 'east');
+  eq(computeRegion(open).isEnclosed, false, 'open shell (missing wall) not enclosed');
+
+  // L-shape stays an L (NOT its bbox): a 2×2 square with the top-right cell
+  // removed (a notch). The notch is inside the wall bbox but must be OUTSIDE the
+  // region — proving the region is the true enclosed shape, not the bounding box.
+  const lshape = [
+    e('north', 0, 0),        // top of top-left cell
+    e('east', W, 0),         // right of top-left cell (left of the notch)
+    e('north', W, W),        // top of bottom-right cell (bottom of the notch)
+    e('east', 2 * W, W),     // right of bottom-right cell
+    e('south', W, 2 * W),    // bottom of bottom-right cell
+    e('south', 0, 2 * W),    // bottom of bottom-left cell
+    e('west', 0, W),         // left of bottom-left cell
+    e('west', 0, 0),         // left of top-left cell
+  ];
+  const lr = computeRegion(lshape);
+  eq(lr.isEnclosed, true, 'L-shape enclosed');
+  eq(lr.containsPoint(W / 2, 1.5 * W), true, 'L-shape: bottom-left cell in region');
+  eq(lr.containsPoint(1.5 * W, 1.5 * W), true, 'L-shape: bottom-right cell in region');
+  eq(lr.containsPoint(1.5 * W, W / 2), false, 'L-shape: NOTCH (top-right) not in region (not bbox)');
 }
 
 // ---- 2. bay gaps derive 14½ / 14½ / 13 from stud faces ---------------------
