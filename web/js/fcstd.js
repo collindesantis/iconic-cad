@@ -12,6 +12,8 @@
 // =====================================================
 import { doc } from './state.js';
 import { IN_TO_MM } from './constants.js';
+import { enumerateMembers } from './members.js';
+import { panelHeightMM } from './designs.js';
 
 const NOMINAL_TO_ACTUAL = {
   '2x2': [1.5, 1.5], '2x3': [1.5, 2.5], '2x4': [1.5, 3.5], '2x6': [1.5, 5.5],
@@ -231,6 +233,10 @@ export const _test = {
 export async function exportFcstd(filename = 'house.FCStd') {
   const ents = doc.entities;
   if (ents.length === 0) { alert('Place some modules first.'); return; }
+  const l1Ents = ents.filter(e => (e.level || 'L1') === 'L1');
+  const l2BaseZ = l1Ents.length
+    ? Math.max(...l1Ents.map(e => panelHeightMM(enumerateMembers(e.mod)))) : 0;
+  const ez = (e) => (e.level || 'L1') === 'L2' ? l2BaseZ : 0;
   // cache: 'reload' — always pull the current library assets from the network.
   // The export geometry is baked into these .brp/.json files; a stale HTTP-cached
   // copy (e.g. pre-mirror breps) silently produces a wrong/mirrored export even
@@ -250,7 +256,7 @@ export async function exportFcstd(filename = 'house.FCStd') {
     const ft = (e.mod.aperture && e.mod.aperture.height_ft) || (e.mod.id.includes('8.5') ? 8.5 : 8);
     bounds.minX = Math.min(bounds.minX, x0); bounds.maxX = Math.max(bounds.maxX, x0 + e.mod.width_mm);
     bounds.minY = Math.min(bounds.minY, -yb - dp); bounds.maxY = Math.max(bounds.maxY, -yb);
-    bounds.maxZ = Math.max(bounds.maxZ, ft * 12 * IN_TO_MM);
+    bounds.maxZ = Math.max(bounds.maxZ, ez(e) + ft * 12 * IN_TO_MM);
   }
 
   const objs = []; let bi = 0;
@@ -262,11 +268,11 @@ export async function exportFcstd(filename = 'house.FCStd') {
     // boxes are still built canonical at Y in [0, dy], so mirror their corner to
     // [-ty-dy, -ty] (a box is symmetric, so position is all that's needed).
     objs.push({ name: `Wall${i}`, label: `wall_${String(i).padStart(2, '0')}_${e.id}`,
-                brep: translateBrep(tmpl, e.x_mm - minx, -(e.y_mm - miny), 0) });
+                brep: translateBrep(tmpl, e.x_mm - minx, -(e.y_mm - miny), ez(e)) });
     for (const conn of (e.connections || [])) {
       for (const [dx, dy, dz, tx, ty, tz] of createBlocking(conn, byId, minx, miny)) {
         objs.push({ name: `Blk${bi}`, label: `blocking_${String(bi).padStart(2, '0')}_${conn.blocking || 'C'}`,
-                    brep: boxBrep(dx, dy, dz, tx, -ty - dy, tz) });
+                    brep: boxBrep(dx, dy, dz, tx, -ty - dy, tz + ez(e)) });
         bi++;
       }
     }
