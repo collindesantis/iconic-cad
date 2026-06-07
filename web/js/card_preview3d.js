@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { buildWall3D } from './render3d.js';
 
-const IMG_H       = 76;
+const IMG_FALLBACK = 50;                      // icon size if the <img> can't be measured
 const SPEED       = 2 * Math.PI / (7 * 60);  // one rev per ~7 s at 60 fps
 const _POLAR      = Math.PI * 9 / 32;        // 51° from zenith = 39° above horizontal
 const START_AZIM  = Math.PI * 0.25;          // consistent start pose matching iso thumbnail angle
@@ -21,14 +21,14 @@ let _rafId    = null;
 let _activeCard = null;
 let _activeImg  = null;
 
-function ensureRenderer(w) {
+function ensureRenderer(w, h) {
   if (!_renderer) {
     _renderer = new THREE.WebGLRenderer({ antialias: true });
     _renderer.setClearColor(0x111828);
 
     const el = _renderer.domElement;
     el.style.cssText =
-      'position:absolute;top:4px;left:4px;z-index:5;pointer-events:none;border-radius:3px;';
+      'position:absolute;z-index:5;pointer-events:none;border-radius:3px;';
 
     _scene = new THREE.Scene();
     _camera = new THREE.PerspectiveCamera(45, 1, 1, 100000);
@@ -39,8 +39,8 @@ function ensureRenderer(w) {
     _modelRoot = new THREE.Group();
     _scene.add(_modelRoot);
   }
-  _renderer.setSize(w, IMG_H);
-  _camera.aspect = w / IMG_H;
+  _renderer.setSize(w, h);
+  _camera.aspect = w / h;
   _camera.updateProjectionMatrix();
 }
 
@@ -84,12 +84,19 @@ export function cardHover(card, mod) {
   if (_activeCard) cardLeave(_activeCard);
   _activeCard = card;
 
-  const w = Math.max(card.offsetWidth - 8, 60);
-  ensureRenderer(w);
+  _activeImg = card.querySelector('img');
+  // Size + place the preview over the icon box only, not the whole card.
+  const w = _activeImg ? _activeImg.offsetWidth  : IMG_FALLBACK;
+  const h = _activeImg ? _activeImg.offsetHeight : IMG_FALLBACK;
+  ensureRenderer(w, h);
+
+  const el = _renderer.domElement;
+  el.style.left = (_activeImg ? _activeImg.offsetLeft : 4) + 'px';
+  el.style.top  = (_activeImg ? _activeImg.offsetTop  : 4) + 'px';
+
   _azimuth = START_AZIM;
   loadMod(mod);
 
-  _activeImg = card.querySelector('img');
   if (_activeImg) _activeImg.style.visibility = 'hidden';
 
   card.appendChild(_renderer.domElement);

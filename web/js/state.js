@@ -61,6 +61,7 @@ export const ui = {
   activeTab: '2d',     // '2d' | '3d'
   placeDir: 'north',   // direction applied to a module picked in iso-library mode
   libMode: 'iso',      // 'iso' (one thumbnail + NESW selector) | 'icons' (4 per module)
+  libCategory: 'walls', // library tab: 'walls' | 'windows' | 'doors' | 'interior'
 };
 
 // ---- Undo / redo ----------------------------------------------------------

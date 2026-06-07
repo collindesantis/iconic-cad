@@ -34,40 +34,78 @@ function pickModule(mod, dir) {
   requestDraw();
 }
 
+// ---- Library category tabs (Walls / Windows / Doors / Interior) -------------
+const LIB_TABS = [
+  { id: 'walls',    label: 'Walls' },
+  { id: 'windows',  label: 'Windows' },
+  { id: 'doors',    label: 'Doors' },
+  { id: 'interior', label: 'Interior' },
+];
+
+function categoryMods(cat) {
+  switch (cat) {
+    case 'windows':  return APERTURE_MODULES.filter(m => m.aperture.type === 'window');
+    case 'doors':    return APERTURE_MODULES.filter(m => m.aperture.type !== 'window');
+    case 'interior': return [...INTERIOR_MODULES, ...INT_APERTURE_MODULES];
+    case 'walls':
+    default:         return MODULES;
+  }
+}
+
+function buildLibTabs() {
+  const el = document.getElementById('lib-tabs');
+  el.innerHTML = '';
+  LIB_TABS.forEach(t => {
+    const b = document.createElement('button');
+    b.className = 'lib-tab' + (ui.libCategory === t.id ? ' active' : '');
+    b.textContent = t.label;
+    b.addEventListener('click', () => {
+      ui.libCategory = t.id;
+      buildLibTabs();
+      buildSidebar();
+    });
+    el.appendChild(b);
+  });
+}
+
 function buildSidebar() {
   const lib = document.getElementById('module-library');
   lib.innerHTML = '';
-  if (ui.libMode === 'iso') buildIsoLibrary(lib);
-  else buildIconLibrary(lib);
+  const mods = categoryMods(ui.libCategory);
+  const make = ui.libMode === 'iso' ? isoCard : iconCard;
+  mods.forEach(mod => lib.appendChild(make(mod)));
+}
+
+// Short "where it's used" hint shown under each card label.
+function moduleHint(mod) {
+  if (mod.aperture) {
+    const t = mod.aperture.type;
+    if (t === 'window') return 'Window rough opening';
+    if (mod.interior)   return 'Interior door opening';
+    if (t === 'garage')      return 'Garage door opening';
+    if (t === 'sliding')     return 'Sliding patio door';
+    if (t === 'double_door') return 'Double exterior door';
+    return 'Exterior door opening';
+  }
+  return mod.interior ? 'Interior partition wall' : 'Exterior load-bearing wall';
 }
 
 // ---- ISO MODE: one baked isometric thumbnail per module; NESW selector sets
 // the placement direction (one image instead of four per module). ------------
-function buildIsoLibrary(lib) {
-  const section = (title, mods) => {
-    const header = document.createElement('h2');
-    header.textContent = title;
-    lib.appendChild(header);
-    const grid = document.createElement('div');
-    grid.className = 'iso-grid';
-    mods.forEach(mod => {
-      const item = document.createElement('div');
-      item.className = 'iso-item' + (mod.interior ? ' interior' : '');
-      item.title = `${mod.label} — places facing ${ui.placeDir}; press R to rotate`;
-      item.innerHTML =
-        `<img src="thumbs/${mod.id}.png" alt="${mod.label}" loading="lazy">` +
-        `<div class="iso-label">${mod.label}</div>`;
-      item.addEventListener('click',      () => pickModule(mod, ui.placeDir));
-      item.addEventListener('mouseenter', () => cardHover(item, mod));
-      item.addEventListener('mouseleave', () => cardLeave(item));
-      grid.appendChild(item);
-    });
-    lib.appendChild(grid);
-  };
-  section('EXTERIOR', MODULES);
-  section('INTERIOR', INTERIOR_MODULES);
-  section('WINDOWS + DOORS', APERTURE_MODULES);
-  section('INTERIOR DOORS', INT_APERTURE_MODULES);
+function isoCard(mod) {
+  const item = document.createElement('div');
+  item.className = 'iso-item' + (mod.interior ? ' interior' : '');
+  item.title = `${mod.label} — places facing ${ui.placeDir}; press R to rotate`;
+  item.innerHTML =
+    `<img src="thumbs/${mod.id}.png" alt="${mod.label}" loading="lazy">` +
+    `<div class="iso-text">` +
+      `<div class="iso-label">${mod.label}</div>` +
+      `<div class="iso-hint">${moduleHint(mod)}</div>` +
+    `</div>`;
+  item.addEventListener('click',      () => pickModule(mod, ui.placeDir));
+  item.addEventListener('mouseenter', () => cardHover(item, mod));
+  item.addEventListener('mouseleave', () => cardLeave(item));
+  return item;
 }
 
 // ---- ICON MODE: Marcin's per-direction SVG icons (4 per module). ------------
@@ -102,57 +140,38 @@ function apertureThumb(mod) {
       ${mod.interior ? 'stroke-dasharray="3,2"' : ''}/>${body}</svg>`;
 }
 
-function buildIconLibrary(lib) {
-  const addModuleSection = (title, mods, dirs) => {
-    const header = document.createElement('h2');
-    header.textContent = title;
-    lib.appendChild(header);
-    mods.forEach(mod => {
-      const group = document.createElement('div');
-      group.className = 'module-group';
-      group.innerHTML = `<h3>${mod.label}</h3>`;
-      const grid = document.createElement('div');
-      grid.className = 'module-grid';
-      dirs.forEach(dir => {
-        const item = document.createElement('div');
-        item.className = 'module-item';
-        item.title = `${mod.label} — ${dir}`;
-        if (mod.interior) item.style.borderColor = '#665';
-        const img = document.createElement('img');
-        img.src = `../icons/${mod.id}_${dir}.svg`;
-        item.appendChild(img);
-        item.addEventListener('click', () => pickModule(mod, dir));
-        grid.appendChild(item);
-      });
-      group.appendChild(grid);
-      lib.appendChild(group);
-    });
-  };
-  const addApertureSection = (title, mods) => {
-    const header = document.createElement('h2');
-    header.textContent = title;
-    lib.appendChild(header);
-    mods.forEach(mod => {
-      const group = document.createElement('div');
-      group.className = 'module-group';
-      group.innerHTML = `<h3>${mod.label}</h3>`;
-      const grid = document.createElement('div');
-      grid.className = 'module-grid';
+// ---- ICON MODE (legacy): per-direction SVG icons; apertures use a single
+// schematic thumb. One card per module. ---------------------------------------
+function iconCard(mod) {
+  const group = document.createElement('div');
+  group.className = 'module-group';
+  group.innerHTML = `<h3>${mod.label}</h3>`;
+  const grid = document.createElement('div');
+  grid.className = 'module-grid';
+  if (mod.aperture) {
+    const item = document.createElement('div');
+    item.className = 'module-item';
+    item.title = `${mod.label} — pick, then press R to rotate`;
+    if (mod.interior) item.style.borderColor = '#665';
+    item.innerHTML = apertureThumb(mod);
+    item.addEventListener('click', () => pickModule(mod, 'north'));
+    grid.appendChild(item);
+  } else {
+    const dirs = mod.interior ? ['north', 'east'] : DIRECTIONS;
+    dirs.forEach(dir => {
       const item = document.createElement('div');
       item.className = 'module-item';
-      item.title = `${mod.label} — pick, then press R to rotate`;
+      item.title = `${mod.label} — ${dir}`;
       if (mod.interior) item.style.borderColor = '#665';
-      item.innerHTML = apertureThumb(mod);
-      item.addEventListener('click', () => pickModule(mod, 'north'));
+      const img = document.createElement('img');
+      img.src = `../icons/${mod.id}_${dir}.svg`;
+      item.appendChild(img);
+      item.addEventListener('click', () => pickModule(mod, dir));
       grid.appendChild(item);
-      group.appendChild(grid);
-      lib.appendChild(group);
     });
-  };
-  addModuleSection('EXTERIOR', MODULES, DIRECTIONS);
-  addModuleSection('INTERIOR', INTERIOR_MODULES, ['north', 'east']);
-  addApertureSection('WINDOWS + DOORS', APERTURE_MODULES);
-  addApertureSection('INTERIOR DOORS', INT_APERTURE_MODULES);
+  }
+  group.appendChild(grid);
+  return group;
 }
 
 // ---- Library mode toggle (Iso 3D default; Icons = "legacy") -----------------
@@ -161,11 +180,11 @@ function buildLibMode() {
   el.innerHTML = '';
 
   const wrap = document.createElement('div');
-  wrap.style.cssText = 'display:flex; align-items:center; justify-content:flex-end; gap:6px; padding:2px 0 8px; width:100%;';
+  wrap.style.cssText = 'display:flex; align-items:center; justify-content:flex-start; gap:6px;';
 
   const label = document.createElement('span');
   label.textContent = 'Legacy';
-  label.style.cssText = 'font-size:11px; color:#667; font-weight:bold; letter-spacing:1px;';
+  label.style.cssText = 'font-size:11px; color:#9ab; font-weight:bold; letter-spacing:1px;';
 
   const toggle = document.createElement('button');
   toggle.className = 'panel-toggle' + (ui.libMode === 'icons' ? ' active' : '');
@@ -460,9 +479,13 @@ export function initUI() {
   try { ui.libMode = localStorage.getItem('iconic.libMode') || ui.libMode; } catch (e) { /* ignore */ }
   buildDirSelector();
   buildLibMode();
+  buildLibTabs();
   buildSidebar();
   wireCanvas();
   wireHotkeys();
+
+  // Save Work — one-click download of the current layout.
+  document.getElementById('btn-save-work').addEventListener('click', () => saveLayout());
 
   // Toolbar
   document.getElementById('btn-clear').addEventListener('click', clearAll);
@@ -534,13 +557,10 @@ export function initUI() {
     promptFilename('house.FCStd', (f) => closeAndExport(() => exportFcstd(f))));
   document.getElementById('btn-modal-export-json').addEventListener('click', () =>
     promptFilename('layout.json', (f) => closeAndExport(() => exportJSON(f))));
-  document.getElementById('btn-modal-save').addEventListener('click', () =>
-    promptFilename('layout-save.json', (f) => closeAndExport(() => saveLayout(f))));
   document.getElementById('btn-modal-fab').addEventListener('click', () =>
     promptFilename('fab-drawings.html', (f) => closeAndExport(() => exportFabDrawings(f))));
   document.getElementById('btn-modal-summary').addEventListener('click', () =>
     promptFilename('build-summary.html', (f) => closeAndExport(() => generateBuildSummary(f))));
-  document.getElementById('btn-modal-load').addEventListener('click', () => { exportModal.classList.remove('open'); document.getElementById('load-input').click(); });
 
   // Tabs
   document.getElementById('btn-tab-framing').addEventListener('click', () => switchTab('2d'));
