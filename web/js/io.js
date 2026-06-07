@@ -24,6 +24,7 @@ function serialize(includeMeta) {
       layer: p.layer,
       width_mm: p.mod.width_mm,
       depth_mm: p.mod.depth_mm,
+      ...(p.owner ? { owner: p.owner } : {}),
       ...(p.connections && p.connections.length > 0 ? { connections: p.connections } : {}),
     })),
   };
@@ -68,6 +69,7 @@ export function loadLayout(event) {
         level: m.level || doc.activeLevel,
         layer: m.layer || 'structural',
         id: m.id || `wall_${ui.nextId}`,
+        owner: m.owner || null, // claim: initials/name, set in the design file; null = unclaimed
         connections: m.connections || [],
         props: m.props || {},
       });

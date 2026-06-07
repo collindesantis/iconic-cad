@@ -537,10 +537,20 @@ body { font-family: -apple-system, sans-serif; display: flex; height: 100vh; bac
     <div class="export-row">
       <div class="export-row-info">
         <strong>Export Fab Drawings</strong>
-        <span>Generates per-panel SVG fabrication drawings with cut dimensions and stud layout. Downloads as a build-book ZIP.</span>
+        <span>Generates per-panel SVG fabrication drawings with cut dimensions and stud layout. Downloads as a print-to-PDF build book.</span>
       </div>
       <div class="export-row-actions">
         <button class="btn-modal-export" id="btn-modal-fab">Export</button>
+      </div>
+    </div>
+
+    <div class="export-row">
+      <div class="export-row-info">
+        <strong>Generate Build Summary</strong>
+        <span>A coordination packet: modules grouped by run, an in-place build map, a whole-build cut &amp; pick list, plus one fab card per distinct design. Opens as a print-to-PDF book.</span>
+      </div>
+      <div class="export-row-actions">
+        <button class="btn-modal-export" id="btn-modal-summary">Generate</button>
       </div>
     </div>
   </div>

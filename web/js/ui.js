@@ -17,6 +17,7 @@ import { cardHover, cardLeave } from './card_preview3d.js';
 import { exportJSON, saveLayout, loadLayout } from './io.js';
 import { exportFcstd } from './fcstd.js';
 import { exportFabDrawings } from './render_fab.js';
+import { generateBuildSummary } from './render_summary.js';
 
 const canvas = document.getElementById('design-canvas');
 
@@ -537,6 +538,8 @@ export function initUI() {
     promptFilename('layout-save.json', (f) => closeAndExport(() => saveLayout(f))));
   document.getElementById('btn-modal-fab').addEventListener('click', () =>
     promptFilename('fab-drawings.html', (f) => closeAndExport(() => exportFabDrawings(f))));
+  document.getElementById('btn-modal-summary').addEventListener('click', () =>
+    promptFilename('build-summary.html', (f) => closeAndExport(() => generateBuildSummary(f))));
   document.getElementById('btn-modal-load').addEventListener('click', () => { exportModal.classList.remove('open'); document.getElementById('load-input').click(); });
 
   // Tabs

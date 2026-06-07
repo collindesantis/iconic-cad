@@ -1,0 +1,12 @@
+{
+  "_license": "CC BY-SA 4.0 · Iconic CAD / Open Source Ecology.",
+  "_todo": "STUB — window archetype authored content not written yet. The card composer falls back to derived-only sections when authored arrays are empty. Fill materials/procedure/hole_pattern from the OSE window-panel template.",
+  "archetype": "window",
+  "title": "WINDOW WALL PANEL",
+  "materials_nonlumber": [],
+  "tools": [],
+  "procedure": [],
+  "hole_pattern": null,
+  "qc": [],
+  "salient": []
+}

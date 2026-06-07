@@ -77,6 +77,53 @@ function framingBreakdown(placed) {
   return b;
 }
 
+// Generic aggregate: sum every source's line items by material_key. This is THE
+// summation — the build-summary cut/pick sheet (render_summary.js) re-renders
+// this, it does not re-sum. Pure over the entity list.
+export function aggregateLineItems(entities) {
+  const agg = {};
+  for (const e of entities) {
+    for (const li of lineItemsForEntity(e)) agg[li.material_key] = (agg[li.material_key] || 0) + li.qty;
+  }
+  return agg;
+}
+
+// Flat priced catalog (lumber + hardware), or {} before pricing loads.
+export function getCatalog() {
+  return pricingData ? { ...pricingData.lumber, ...pricingData.hardware } : {};
+}
+
+// Friendly part name per member role (cut-list display only; summation stays generic).
+const PART_LABEL = {
+  stud: 'Stud', king: 'King stud', jack: 'Jack stud',
+  top_cripple: 'Cripple', lower_cripple: 'Cripple',
+  bottom_plate: 'Plate', top_plate: 'Plate',
+  sill: 'Sill', subheader: 'Subheader', sill_block: 'Sill block',
+  header: 'Header', sheathing: 'OSB sheathing',
+};
+const inRound = mm => Math.round(mm / IN_TO_MM);
+
+// Framing cut list grouped by {part, nominal, length}. Framing-aware DISPLAY
+// (like framingBreakdown), built from the one member enumerator — not a second
+// BOM. Returns rows {part, nominal, lengthLabel, qty} sorted part then longest.
+export function cutListGrouped(entities) {
+  const map = new Map();
+  for (const e of entities) {
+    if (e.kind !== 'wall' && e.kind !== 'iwall') continue;
+    for (const m of enumerateMembers(e.mod)) {
+      const part = PART_LABEL[m.role] || m.role;
+      let lengthLabel, sortLen;
+      if (m.role === 'sheathing') { lengthLabel = `${inRound(m.w_mm)}×${inRound(m.h_mm)}″`; sortLen = 1e9; }
+      else { const L = inRound(m.length_mm); lengthLabel = `${L}″`; sortLen = L; }
+      const key = `${part}|${m.nominal}|${lengthLabel}`;
+      const cur = map.get(key) || { part, nominal: m.nominal, lengthLabel, qty: 0, sortLen };
+      cur.qty += (m.plies || 1);
+      map.set(key, cur);
+    }
+  }
+  return [...map.values()].sort((a, b) => a.part.localeCompare(b.part) || b.sortLen - a.sortLen);
+}
+
 export function updateBOM() {
   const el = document.getElementById('bom-content');
   if (!el) return;
@@ -86,13 +133,9 @@ export function updateBOM() {
     return;
   }
 
-  // Generic aggregate: sum every source's line items by material_key, price
-  // against the flat catalog. No framing concepts here.
-  const catalog = { ...pricingData.lumber, ...pricingData.hardware };
-  const agg = {};
-  for (const e of placed) {
-    for (const li of lineItemsForEntity(e)) agg[li.material_key] = (agg[li.material_key] || 0) + li.qty;
-  }
+  // Generic aggregate, priced against the flat catalog. No framing concepts here.
+  const catalog = getCatalog();
+  const agg = aggregateLineItems(placed);
   let totalCost = 0;
   for (const [key, qty] of Object.entries(agg)) {
     const c = catalog[key];

@@ -11,7 +11,9 @@ import { ZOOM_DEFAULT } from './constants.js';
 //
 // Entity shape (in-memory):
 //   { id, kind:'wall'|'iwall', mod:<module ref>, dir, x_mm, y_mm,
-//     level:<levelId>, layer:<layerId>, connections:[], props:{} }
+//     level:<levelId>, layer:<layerId>, owner:<initials|null>, connections:[], props:{} }
+// `owner` is the claim: a builder's name/initials set in the design file (no
+// claim UI yet). Absent/null = unclaimed. Round-tripped through io.js.
 // On export `mod` is written as its module id string.
 export const doc = {
   version: 2,

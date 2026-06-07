@@ -1,0 +1,46 @@
+{
+  "_license": "Authored card content for the OSE standard wall panel. CC BY-SA 4.0 · Iconic CAD / Open Source Ecology.",
+  "_note": "Authored half of the fab card. {tokens} are filled per-instance from numbers(mod); geometry/counts come from the model, never from this file.",
+  "archetype": "standard",
+  "title": "STANDARD WALL PANEL",
+  "materials_nonlumber": [
+    { "qty": "1", "text": "house wrap, 9′ × {wrap_width}″" },
+    { "qty": "{bay_count}", "text": "R-19 insulation batt, {oc}″ O.C. × {stud_len}″" },
+    { "qty": "1", "text": "sill gasket, 5½″ × ~{gasket_len}″" },
+    { "qty": "—", "text": "3-⅛″ & 2½″ T25 screws · housewrap staples" }
+  ],
+  "tools": [
+    "Cordless drill", "T25 Torx bit", "¾″ paddle bit", "framing square",
+    "tape", "hammer stapler", "housewrap scissors", "insulation knife"
+  ],
+  "procedure": [
+    { "text": "Cut {stud_count} studs to {stud_len}″ (= {height}″ − 2×1½ plates)." },
+    { "text": "Mark stud layout on both plates: {layout}″." },
+    { "text": "Screw studs through plates (3-⅛″ T25) → frame." },
+    { "text": "Drill interconnect holes in side studs —", "note": "[OSE] 24″ from each end + ctr; L Ø½″, R Ø¼″; 1″ ctr pin." },
+    { "text": "Staple house wrap; 18″ bottom / 6″ top overhang." },
+    { "text": "Fasten OSB, ¾″ down from panel top." },
+    { "text": "Flip; install R-19 batts between studs." },
+    { "text": "Apply sill gasket to bottom plate." }
+  ],
+  "hole_pattern": {
+    "label": "SIDE-STUD INTERCONNECT DRILL",
+    "fence": "OSE TEMPLATE — not in model geometry",
+    "ends_in": 24,
+    "center_pin_in": 1,
+    "notes": [
+      "Left stud Ø½″ (bolt slips) · Right stud Ø¼″ (bolt bites)",
+      "1″ centering-pin hole, 3″ above center · 3× ½″ lag bolts at seam"
+    ]
+  },
+  "qc": [
+    "square (diagonals)",
+    "{width}″×{height}″",
+    "studs @ {oc}″ O.C."
+  ],
+  "salient": [
+    "Clear bays {first_bay}″; last bay {last_bay}″ — end stud sits flush at the {width}″ edge.",
+    "Single top plate — a lapping cap plate is added at assembly to tie modules (= double top plate).",
+    "Plain panel has no edge blocking; adjacent panels meet at a doubled stud, lag-bolted (see interconnect)."
+  ]
+}
