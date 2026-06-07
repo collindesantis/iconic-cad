@@ -109,35 +109,14 @@ export function showDesign() {
 }
 
 // ---------------------------------------------------------------------------
-// LOAD button — triggers existing #load-input picker, then navigates.
-// Cancel → stay on home view. File chosen → switch to design view.
+// LOAD button — just opens the existing #load-input picker. The actual view
+// switch is driven by the 'iconic:loaded' event (wired in initHome), which
+// io.js fires ONLY after a file parses + applies. Cancel/bad-file → no event →
+// stay on home. This replaces an earlier focus/change-timing race that could
+// drop the first load (the change listener got torn down before it fired).
 // ---------------------------------------------------------------------------
 function onLoadClick() {
-  const loadInput = document.getElementById('load-input');
-  let fileChosen = false;
-
-  function cleanup() {
-    loadInput.removeEventListener('change', onFileChange);
-    window.removeEventListener('focus', onWindowFocus);
-  }
-
-  function onFileChange() {
-    fileChosen = true;
-    cleanup();
-    showDesign();
-  }
-
-  // When the OS file picker closes (cancel or pick), window regains focus.
-  // A short delay lets the 'change' event fire first on file-chosen paths.
-  function onWindowFocus() {
-    setTimeout(() => {
-      if (!fileChosen) cleanup(); // cancelled — already on home, no action needed
-    }, 300);
-  }
-
-  loadInput.addEventListener('change', onFileChange);
-  window.addEventListener('focus', onWindowFocus, { once: true });
-  loadInput.click();
+  document.getElementById('load-input').click();
 }
 
 // ---------------------------------------------------------------------------
@@ -161,6 +140,10 @@ export function initHome() {
     openProjectOptions();
   });
   document.getElementById('btn-home-load').addEventListener('click', onLoadClick);
+
+  // A successful load (io.js) switches home → design view, deterministically.
+  // Harmless if already in design view (showDesign is idempotent).
+  window.addEventListener('iconic:loaded', () => showDesign());
 
   // Tutorial link is a placeholder — prevent navigation until real URL is set.
   document.getElementById('btn-home-tutorial').addEventListener('click', (e) => {

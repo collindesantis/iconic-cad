@@ -104,6 +104,11 @@ export function loadLayout(event) {
     markModelChanged();
     // Refresh the floor switcher (it appears for 2-story loads).
     window.dispatchEvent(new Event('iconic:project'));
+    // Signal a SUCCESSFUL load (fires only here, after parse + apply). home.js
+    // uses this to switch the home view → design view deterministically, with no
+    // focus/change-timing race. A bad/unparseable file throws above and never
+    // reaches here, so a failed load correctly does NOT navigate.
+    window.dispatchEvent(new Event('iconic:loaded'));
   };
   reader.readAsText(file);
   event.target.value = '';
