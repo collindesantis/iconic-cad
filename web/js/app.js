@@ -14,6 +14,9 @@ export function markModelChanged() {
   updateBOM();
   rebuildModel3D();
   draw2d();
+  // Trade gates (framing enclosure, foundation existence) are derived from the
+  // model, so re-evaluate the trade rail / NEXT TRADE button on every change.
+  window.dispatchEvent(new Event('iconic:model'));
 }
 
 // Only transient/view state changed (drag, pan, zoom, rotate, blocking mode).

@@ -8,6 +8,8 @@ import { loadPricing, updateBOM } from './bom.js';
 import { resizeCanvas } from './render2d.js';
 import { initHome } from './home.js';
 import { initProjectOptions } from './options.js';
+import { initFoundationModal } from './foundation.js';
+import { initTrades } from './trades.js';
 
 try {
   init3d();
@@ -16,6 +18,8 @@ try {
 }
 initUI();
 initProjectOptions();
+initFoundationModal();
+initTrades();
 initHome();
 resizeCanvas();
 loadPricing().then(updateBOM);

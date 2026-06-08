@@ -28,6 +28,7 @@ export function findSnap(cursorX_mm, cursorY_mm, mod, dir) {
 
   // Check each placed module's ports against drag module's ports
   for (const p of placed) {
+    if (p.kind === 'foundation') continue; // derived 3D-only object — no module/ports
     if (p.level !== doc.activeLevel) continue; // never snap across levels (L2↔L1)
     // Interior walls attach to exterior walls only via T-junction (which makes a
     // real connection + blocking) — never by corner port-snap, which would place
@@ -90,6 +91,7 @@ export function findSnap(cursorX_mm, cursorY_mm, mod, dir) {
   if (doc.activeLevel !== 'L1' && !mod.interior) {
     let bestStack = null, bestStackD = Infinity;
     for (const p of placed) {
+      if (p.kind === 'foundation') continue; // derived 3D-only object — no module/ports
       if (p.level === doc.activeLevel) continue; // a wall on the level BELOW
       if (p.kind !== 'wall') continue;           // exterior only
       const pbb = getModuleBBox(p.mod, p.dir);
@@ -110,6 +112,7 @@ export function wouldOverlap(x, y, bb, mod, dir) {
   // but reject large overlaps (module stacking on top of each other)
   const maxAllowed = WALL_DEPTH * WALL_DEPTH * 1.5; // ~D² with some tolerance
   for (const p of placed) {
+    if (p.kind === 'foundation') continue; // derived 3D-only object — no module/ports
     if (p.level !== doc.activeLevel) continue; // L2 stacks over L1 — only same-level overlap counts
     const pbb = getModuleBBox(p.mod, p.dir);
     const overlapW = Math.min(x + bb.w, p.x_mm + pbb.w) - Math.max(x, p.x_mm);
@@ -209,6 +212,7 @@ function nearACorner(p, contactAlong) {
   const pIsH = isHorizontal(p.dir);
   const pbb = getModuleBBox(p.mod, p.dir);
   for (const q of placed) {
+    if (q.kind === 'foundation') continue; // derived 3D-only object — no module/ports
     if (q === p || q.mod.interior) continue;
     if (isHorizontal(q.dir) === pIsH) continue; // perpendicular walls only
     const qbb = getModuleBBox(q.mod, q.dir);
@@ -228,6 +232,7 @@ function nearACorner(p, contactAlong) {
 // targets) and symmetric (both sides), measured along the run.
 function interiorContactTooClose(contactX, contactY, faceAxis) {
   for (const q of placed) {
+    if (q.kind === 'foundation') continue; // derived 3D-only object — no module/ports
     if (!q.mod.interior || !q.connections) continue;
     for (const c of q.connections) {
       if (faceAxis === 'x') {                                  // horizontal run: same Y line, space along X
@@ -320,6 +325,7 @@ function apertureSwingConflicts(mod, dir, x_mm, y_mm) {
   const mine = doorSwingSectors(mod, dir, x_mm, y_mm);
   if (!mine.length) return false;
   for (const q of placed) {
+    if (q.kind === 'foundation') continue; // derived 3D-only object — no module/ports
     const theirs = doorSwingSectors(q.mod, q.dir, q.x_mm, q.y_mm);
     for (const s1 of mine)
       for (const s2 of theirs)
@@ -332,6 +338,7 @@ function apertureSwingConflicts(mod, dir, x_mm, y_mm) {
 function iwallTooCloseToExisting(x_mm, y_mm, dir) {
   const isH = isHorizontal(dir);
   for (const q of placed) {
+    if (q.kind === 'foundation') continue; // derived 3D-only object — no module/ports
     if (!q.mod.interior) continue;
     if (isHorizontal(q.dir) !== isH) continue; // only check parallel interior walls
     const dist = isH ? Math.abs(x_mm - q.x_mm) : Math.abs(y_mm - q.y_mm);
@@ -346,6 +353,7 @@ function iwallTooCloseToExteriorParallel(x_mm, y_mm, mod, dir) {
   const bb = getModuleBBox(mod, dir);
   const aStart = isH ? x_mm : y_mm, aEnd = aStart + (isH ? bb.w : bb.h);
   for (const q of placed) {
+    if (q.kind === 'foundation') continue; // derived 3D-only object — no module/ports
     if (q.mod.interior) continue;               // exterior walls only
     if (isHorizontal(q.dir) !== isH) continue;  // parallel runs only
     const qbb = getModuleBBox(q.mod, q.dir);
@@ -371,6 +379,7 @@ function apertureSeamContacts(p) {
   const valid = [];
   for (const edge of edges) {
     for (const q of placed) {
+      if (q.kind === 'foundation') continue; // derived 3D-only object — no module/ports
       if (q === p || q.mod.interior) continue;
       if (isHorizontal(q.dir) !== isH) continue;           // same run orientation
       const qLine = isH ? q.y_mm : q.x_mm;
@@ -402,6 +411,7 @@ function findTJunctionSnap(cursorX_mm, cursorY_mm, mod, dir) {
   let bestSnap = null;
 
   for (const p of placed) {
+    if (p.kind === 'foundation') continue; // derived 3D-only object — no module/ports
     if (p.level !== doc.activeLevel) continue; // never T-junction across levels
     const pIsH = isHorizontal(p.dir);
     if (dragIsH === pIsH) continue;

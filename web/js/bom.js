@@ -12,6 +12,8 @@
 import { doc } from './state.js';
 import { enumerateMembers } from './members.js';
 import { IN_TO_MM } from './constants.js';
+import { regionForLevel } from './region.js';
+import { getModuleBBox } from './geometry.js';
 
 let pricingData = null;
 
@@ -124,6 +126,27 @@ export function cutListGrouped(entities) {
   return [...map.values()].sort((a, b) => a.part.localeCompare(b.part) || b.sortLen - a.sortLen);
 }
 
+// Foundation estimate — DERIVED from the foundation entity's params + the L1
+// silhouette (same source the 3D geometry uses). Concrete = slab (silhouette
+// area × thickness) + grade beam (perimeter × beam_w × beam_d). EPS skirt =
+// perimeter × skirt_depth at skirt_thickness. Estimates, not engineered takeoff.
+export function foundationEstimate(entities) {
+  const f = entities.find(e => e.kind === 'foundation');
+  if (!f) return null;
+  const p = f.params;
+  const region = regionForLevel('L1');
+  const slabArea = region.rects.reduce((s, r) => s + r.w_mm * r.h_mm, 0); // mm²
+  let perim = 0; // sum of L1 exterior-wall run lengths = perimeter (incl. L-shapes)
+  for (const w of entities) {
+    if (w.kind !== 'wall' || (w.level || 'L1') !== 'L1') continue;
+    const bb = getModuleBBox(w.mod, w.dir);
+    perim += Math.max(bb.w, bb.h);
+  }
+  const concrete_m3 = (slabArea * p.slab_thickness_mm + perim * p.beam_w_mm * p.beam_d_mm) / 1e9;
+  const eps_m2 = (perim * p.skirt_depth_mm) / 1e6;
+  return { concrete_m3, eps_m2, eps_sf: eps_m2 * 10.7639 };
+}
+
 export function updateBOM() {
   const el = document.getElementById('bom-content');
   if (!el) return;
@@ -146,6 +169,7 @@ export function updateBOM() {
   const totalOSB = agg['osb_7_16_4x8'] || 0;
   const totalNails = agg['nail_16d_sinker'] || 0;
   const totalScrews = agg['screw_3in'] || 0;
+  const fe = foundationEstimate(placed);
 
   el.innerHTML = `
     <table style="width:100%; border-collapse:collapse;">
@@ -159,6 +183,10 @@ export function updateBOM() {
       <tr><td colspan="2" style="border-top:1px solid #333; padding-top:4px; color:#667; font-weight:bold;">Hardware</td></tr>
       <tr><td>16d nails</td><td style="text-align:right">${totalNails}</td></tr>
       <tr><td>3" screws</td><td style="text-align:right">${totalScrews}</td></tr>
+      ${fe ? `
+      <tr><td colspan="2" style="border-top:1px solid #333; padding-top:4px; color:#667; font-weight:bold;">Foundation <span style="color:#557; font-weight:normal;">(est.)</span></td></tr>
+      <tr><td>Concrete</td><td style="text-align:right">${fe.concrete_m3.toFixed(2)} m³</td></tr>
+      <tr><td>EPS skirt</td><td style="text-align:right">${fe.eps_sf.toFixed(0)} sf</td></tr>` : ''}
       <tr><td colspan="2" style="border-top:1px solid #333; padding-top:6px; color:#4fc3f7; font-weight:bold;">Est. cost</td></tr>
       <tr><td colspan="2" style="text-align:right; font-size:14px; color:#4fc3f7; font-weight:bold;">$${totalCost.toFixed(2)}</td></tr>
     </table>

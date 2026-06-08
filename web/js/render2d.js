@@ -143,7 +143,9 @@ export function draw2d() {
   const onL2 = doc.activeLevel === 'L2';
   // Only the active level's entities are drawn solid + interactive; other levels
   // appear (if at all) as ghosts. New placements land on doc.activeLevel.
-  const activeEnts = placed.filter(p => p.level === doc.activeLevel);
+  // Foundation entities are derived 3D-only objects with no module / 2D symbol —
+  // never drawn on the build grid.
+  const activeEnts = placed.filter(p => p.level === doc.activeLevel && p.kind !== 'foundation');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // Background grid
@@ -165,7 +167,7 @@ export function draw2d() {
       ctx.fillRect(view.offsetX + mmToPx(r.x_mm), view.offsetY + mmToPx(r.y_mm),
                    mmToPx(r.w_mm), mmToPx(r.h_mm));
     }
-    for (const p of placed) if (p.level === 'L1') drawGhost(p);
+    for (const p of placed) if (p.level === 'L1' && p.kind !== 'foundation') drawGhost(p);
   }
 
   // Draw active-level modules

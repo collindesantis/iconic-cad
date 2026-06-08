@@ -77,6 +77,19 @@ body { font-family: 'Space Mono', 'Courier New', monospace; display: flex; heigh
 }
 .trade-btn:hover { border-color: #4fc3f7; }
 .trade-btn.active { background: #2a3a5c; color: #4fc3f7; border-color: #4fc3f7; }
+/* Trade-flow states (trades.js): current=active, done=blue & clickable, locked=gray */
+.trade-btn.trade-current { background: #2a3a5c; color: #4fc3f7; border-color: #4fc3f7; }
+.trade-btn.trade-done { background: #16213e; color: #4fa3e0; border-color: #3a6a9a; }
+.trade-btn.trade-done:hover { border-color: #4fc3f7; }
+.trade-btn.trade-locked { background: #14182a; color: #4a4f5e; border-color: #2a2f3e; }
+.trade-btn.trade-locked:hover { border-color: #2a2f3e; }
+/* Red hint flashed near the rail when a locked trade is clicked */
+#trade-locked-hint {
+  text-align: center; color: #ff5252; font-size: 11px; font-weight: bold;
+  letter-spacing: 0.4px; opacity: 0; pointer-events: none; padding-top: 2px;
+  transition: opacity 0.15s ease;
+}
+#trade-locked-hint.show { opacity: 1; }
 .trade-arrow {
   text-align: center;
   color: #4a5a7a;
@@ -545,6 +558,51 @@ body { font-family: 'Space Mono', 'Courier New', monospace; display: flex; heigh
   overflow-y: hidden;
 }
 
+/* NEXT TRADE — large green bottom-center gate overlaying the build grid */
+#next-trade-wrap {
+  position: absolute;
+  left: 50%; bottom: 210px;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  pointer-events: none;
+}
+#btn-next-trade {
+  pointer-events: auto;
+  padding: 16px 48px;
+  font-size: 18px; font-weight: bold; letter-spacing: 2px;
+  border-radius: 8px;
+  font-family: 'Space Mono', 'Courier New', monospace;
+  background: #2a2f3a; border: 1px solid #3a3f4a; color: #667;
+  cursor: not-allowed;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+#btn-next-trade.ready {
+  background: #2e7d32; border-color: #43a047; color: #fff; cursor: pointer;
+  box-shadow: 0 4px 20px rgba(46,125,50,0.5);
+}
+#btn-next-trade.ready:hover { background: #388e3c; }
+#next-trade-hint {
+  font-size: 12px; font-weight: bold; letter-spacing: 0.5px; text-align: center;
+  color: #8a93a8; background: rgba(10,14,28,0.65);
+  padding: 4px 12px; border-radius: 4px;
+}
+#next-trade-wrap.terminal #next-trade-hint { color: #4fc3f7; }
+
+/* Transient trade toast (foundation cleared, etc.) — top-center of the grid */
+#trade-toast {
+  position: absolute; top: 14px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  background: rgba(198,40,40,0.94); color: #fff;
+  font-size: 12px; font-weight: bold; letter-spacing: 0.4px;
+  padding: 8px 16px; border-radius: 6px; pointer-events: none;
+  opacity: 0; transition: opacity 0.2s ease;
+  font-family: 'Space Mono', 'Courier New', monospace;
+}
+#trade-toast.show { opacity: 1; }
+
 /* Snap indicator */
 .snap-highlight {
   position: absolute;
@@ -623,11 +681,16 @@ body { font-family: 'Space Mono', 'Courier New', monospace; display: flex; heigh
     <button id="btn-save-work">SAVE WORK</button>
   </div>
   <div class="sidebar-title">TRADES</div>
-  <!-- Trade switcher — vertical, top→bottom, arrow points to next trade -->
+  <!-- Trade switcher — vertical, top→bottom, arrow points to next trade.
+       Order is fixed: FRAMING → FOUNDATION → 3D PREVIEW. Per-trade state
+       (current / done-blue / locked-gray) is set by trades.js. -->
   <div id="trade-switcher">
     <button id="btn-tab-framing" class="trade-btn">FRAMING</button>
     <div class="trade-arrow">&#x25BC;</div>
+    <button id="btn-tab-foundation" class="trade-btn">FOUNDATION</button>
+    <div class="trade-arrow">&#x25BC;</div>
     <button id="btn-tab-3d" class="trade-btn">3D PREVIEW</button>
+    <div id="trade-locked-hint">Finish prior trades!</div>
   </div>
   <input type="file" id="load-input" accept=".json" style="display:none;">
   <button id="btn-export-menu" style="margin-top:auto;">Export Menu ▲</button>
@@ -657,6 +720,17 @@ body { font-family: 'Space Mono', 'Courier New', monospace; display: flex; heigh
     <div id="status">Click and drag modules from the library</div>
   </div>
   <div id="canvas3d-wrap"></div>
+
+  <!-- NEXT TRADE gate — large green bottom-center overlay on the build grid.
+       Gray/disabled until the current trade's derived done-condition is met;
+       hidden on the terminal 3D PREVIEW trade. (trades.js) -->
+  <div id="next-trade-wrap">
+    <button id="btn-next-trade">NEXT TRADE &#x2192;</button>
+    <div id="next-trade-hint"></div>
+  </div>
+  <!-- Transient notice (e.g. foundation cleared after a framing edit). -->
+  <div id="trade-toast"></div>
+
   <!-- Footer is now the LIBRARY tray: tabs + legacy toggle on top, scrolling cards below -->
   <div id="footer-bar">
     <div id="lib-bar">
@@ -797,6 +871,41 @@ body { font-family: 'Space Mono', 'Courier New', monospace; display: flex; heigh
     </div>
 
     <button type="button" id="opt-go">GO</button>
+  </div>
+</div>
+
+<!-- Foundation autogen modal — opens when entering the FOUNDATION trade.
+     Climate/recon-prefilled; GO is green on open because the defaults are valid.
+     GO writes one derived foundation entity and enters Foundation REVIEW. -->
+<div id="foundation-modal">
+  <div id="foundation-modal-inner">
+    <h2>// FOUNDATION //</h2>
+    <p class="opt-sub">Autogenerated from your Level-1 silhouette and climate zone. The defaults are sized for this build — change them only if you know why.</p>
+
+    <div class="opt-field">
+      <label for="fnd-skirt">Frost Skirt Depth (mm)</label>
+      <input type="number" id="fnd-skirt" class="fnd-input" step="1" min="1" spellcheck="false">
+      <div class="fnd-note">Prefilled from your climate-zone frost depth.</div>
+    </div>
+
+    <div class="opt-field">
+      <label for="fnd-slab">Slab Thickness (mm)</label>
+      <input type="number" id="fnd-slab" class="fnd-input" step="0.1" min="1" spellcheck="false">
+    </div>
+
+    <div class="opt-field">
+      <label>Grade Beam Size (mm)</label>
+      <div class="fnd-row">
+        <div class="fnd-col"><span class="fnd-sub">Width</span>
+          <input type="number" id="fnd-beam-w" class="fnd-input" step="0.1" min="1" spellcheck="false"></div>
+        <div class="fnd-col"><span class="fnd-sub">Depth</span>
+          <input type="number" id="fnd-beam-d" class="fnd-input" step="0.1" min="1" spellcheck="false"></div>
+      </div>
+    </div>
+
+    <div id="fnd-warn">Editing this may affect the engineering of the house (e.g. frost protection vs. skirt depth). Unless you know what you're doing, keep autogeneration.</div>
+
+    <button type="button" id="fnd-go">GENERATE</button>
   </div>
 </div>
 

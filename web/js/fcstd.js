@@ -231,7 +231,9 @@ export const _test = {
 };
 
 export async function exportFcstd(filename = 'house.FCStd') {
-  const ents = doc.entities;
+  // Framing entities only — the foundation is a derived 3D-review object and is
+  // not part of the FreeCAD framing export.
+  const ents = doc.entities.filter(e => e.kind === 'wall' || e.kind === 'iwall');
   if (ents.length === 0) { alert('Place some modules first.'); return; }
   const l1Ents = ents.filter(e => (e.level || 'L1') === 'L1');
   const l2BaseZ = l1Ents.length

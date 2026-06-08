@@ -14,6 +14,7 @@ import { IN_TO_MM, STUD_DEPTH, OSB_THICK } from './constants.js';
 import { enumerateMembers } from './members.js';
 import { panelHeightMM } from './designs.js';
 import { regionForLevel } from './region.js';
+import { getModuleBBox } from './geometry.js';
 
 // One revolution every ~35 s at 60 fps.
 const DEFAULT_SPEED = 2 * Math.PI / (35 * 60);
@@ -42,6 +43,29 @@ let _polarAtDragStart  = Math.PI * 5 / 12;
 const matLumber      = new THREE.MeshLambertMaterial({ color: 0xdaa520 });
 const matOSB         = new THREE.MeshLambertMaterial({ color: 0x8fbc8f });
 const matIWallLumber = new THREE.MeshLambertMaterial({ color: 0xc4a882 });
+
+// Transparent framing variants — the foundation REVIEW mode ghosts the walls
+// (same 0.18 opacity the L2 floor standin uses) so the solid foundation reads
+// clearly beneath them.
+const TMAT = { transparent: true, opacity: 0.18, depthWrite: false };
+const matLumberT      = new THREE.MeshLambertMaterial({ color: 0xdaa520, ...TMAT });
+const matOSBT         = new THREE.MeshLambertMaterial({ color: 0x8fbc8f, ...TMAT });
+const matIWallLumberT = new THREE.MeshLambertMaterial({ color: 0xc4a882, ...TMAT });
+
+// Foundation materials — concrete gray slab/beam, EPS-foam pink skirt.
+const matConcrete = new THREE.MeshLambertMaterial({ color: 0x9a9a9a });
+const matEPS      = new THREE.MeshLambertMaterial({ color: 0xd98cb3 });
+
+// Render mode: 'solid' (default — framing + foundation solid, the 3D PREVIEW
+// trade) vs 'foundation-review' (framing transparent, foundation solid). Set by
+// trades.js when entering/leaving the foundation trade. buildWall3D reads the
+// derived _framingTransparent flag set in rebuildModel3D.
+let _renderMode = 'solid';
+let _framingTransparent = false;
+export function setRenderMode(mode) {
+  _renderMode = mode;
+  rebuildModel3D();
+}
 
 function updateCamera() {
   const sp = Math.sin(_polar), cp = Math.cos(_polar);
@@ -155,7 +179,9 @@ export function buildWall3D(mod, dir, xPos, yPos, zPos = 0) {
   const isInt = mod.interior;
   const D = isInt ? (3.5 * IN_TO_MM) : STUD_DEPTH;
   const O = isInt ? 0 : OSB_THICK;
-  const wallMat = isInt ? matIWallLumber : matLumber;
+  const wallMat = _framingTransparent ? (isInt ? matIWallLumberT : matLumberT)
+                                      : (isInt ? matIWallLumber : matLumber);
+  const osbMat  = _framingTransparent ? matOSBT : matOSB;
   const horiz = (dir === 'north' || dir === 'south');
   const osbAt = (dir === 'south' || dir === 'west') ? -O / 2 : D + O / 2;
 
@@ -164,8 +190,8 @@ export function buildWall3D(mod, dir, xPos, yPos, zPos = 0) {
     const cz = m.z_mm + m.h_mm / 2;
     if (m.role === 'sheathing') {
       if (O <= 0) continue;
-      if (horiz) addBoxTo(group, m.w_mm, O, m.h_mm, cx, osbAt, cz, matOSB);
-      else       addBoxTo(group, O, m.w_mm, m.h_mm, osbAt, -cx, cz, matOSB);
+      if (horiz) addBoxTo(group, m.w_mm, O, m.h_mm, cx, osbAt, cz, osbMat);
+      else       addBoxTo(group, O, m.w_mm, m.h_mm, osbAt, -cx, cz, osbMat);
     } else {
       if (horiz) addBoxTo(group, m.w_mm, D, m.h_mm, cx, D / 2, cz, wallMat);
       else       addBoxTo(group, D, m.w_mm, m.h_mm, D / 2, -cx, cz, wallMat);
@@ -181,13 +207,70 @@ export function buildWall3D(mod, dir, xPos, yPos, zPos = 0) {
   return group;
 }
 
+// Build the foundation's three.js meshes from its params + the L1 silhouette.
+// DERIVED (nothing baked on the entity): slab fills the region rects; the grade
+// beam + frost skirt trace each L1 exterior-wall footprint. Ground datum z=0 =
+// top of slab, so everything extrudes downward (center z negative). The skirt's
+// outside face is found by probing which side of the wall is NOT enclosed.
+function buildFoundation3D(foundation, minX, minY) {
+  const p = foundation.params;
+  const region = regionForLevel('L1');
+  const cell = region.cells ? region.cells.cell_mm : 76.2;
+  const probe = cell * 0.75; // ~¾ cell past a wall face — clear of the over-mark
+
+  // SLAB — fill the L1 silhouette (region.rects), extruded down from z=0.
+  for (const r of region.rects) {
+    addBoxTo(modelRoot, r.w_mm, r.h_mm, p.slab_thickness_mm,
+      r.x_mm - minX + r.w_mm / 2,
+      -(r.y_mm - minY + r.h_mm / 2),
+      -p.slab_thickness_mm / 2, matConcrete);
+  }
+
+  // Perimeter grade beam + frost skirt, one box each per L1 exterior wall.
+  const l1Walls = doc.entities.filter(e => e.kind === 'wall' && (e.level || 'L1') === 'L1');
+  for (const w of l1Walls) {
+    const bb = getModuleBBox(w.mod, w.dir);
+    const horiz = bb.w >= bb.h;        // wall runs along X
+    const len = horiz ? bb.w : bb.h;
+    const cx = w.x_mm + bb.w / 2;      // footprint center (world plan mm)
+    const cy = w.y_mm + bb.h / 2;
+
+    // GRADE BEAM — along the run, beam_w across, beam_d deep, top at z=0.
+    addBoxTo(modelRoot,
+      horiz ? len : p.beam_w_mm,
+      horiz ? p.beam_w_mm : len,
+      p.beam_d_mm,
+      cx - minX, -(cy - minY), -p.beam_d_mm / 2, matConcrete);
+
+    // FROST SKIRT — thin EPS panel on the wall's OUTSIDE face. Outside = the side
+    // whose just-past-the-face probe is NOT inside the silhouette.
+    if (horiz) {
+      const topOut = !region.containsPoint(cx, w.y_mm - probe);
+      const fy = topOut ? w.y_mm - p.skirt_thickness_mm / 2
+                        : w.y_mm + bb.h + p.skirt_thickness_mm / 2;
+      addBoxTo(modelRoot, len, p.skirt_thickness_mm, p.skirt_depth_mm,
+        cx - minX, -(fy - minY), -p.skirt_depth_mm / 2, matEPS);
+    } else {
+      const leftOut = !region.containsPoint(w.x_mm - probe, cy);
+      const fx = leftOut ? w.x_mm - p.skirt_thickness_mm / 2
+                         : w.x_mm + bb.w + p.skirt_thickness_mm / 2;
+      addBoxTo(modelRoot, p.skirt_thickness_mm, len, p.skirt_depth_mm,
+        fx - minX, -(cy - minY), -p.skirt_depth_mm / 2, matEPS);
+    }
+  }
+}
+
 // Rebuild the scene from the document. Disposes prior geometry (no leak).
 export function rebuildModel3D() {
   if (!_previewEnabled) { _dirty = true; return; }
   modelRoot.traverse(obj => { if (obj.isMesh && obj.geometry) obj.geometry.dispose(); });
   modelRoot.clear();
 
-  const placed = doc.entities;
+  _framingTransparent = _renderMode === 'foundation-review';
+
+  // Framing entities drive the scene extent; the foundation derives from them.
+  const placed = doc.entities.filter(e => e.kind === 'wall' || e.kind === 'iwall');
+  const foundation = doc.entities.find(e => e.kind === 'foundation');
   if (placed.length === 0) {
     hasFitted = false;
     startLoop();
@@ -234,6 +317,11 @@ export function rebuildModel3D() {
       }
     }
   }
+
+  // Foundation: a single derived entity (params only). Geometry is recomputed
+  // here from the L1 silhouette + params, exactly like the floor standin — so a
+  // regenerate is free. Rendered SOLID in both modes; only the framing ghosts.
+  if (foundation) buildFoundation3D(foundation, minX, minY);
 
   const box    = new THREE.Box3().setFromObject(modelRoot);
   const center = new THREE.Vector3(); box.getCenter(center);

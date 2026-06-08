@@ -15,7 +15,10 @@ function serialize(includeMeta) {
     layers: doc.layers,
     project: doc.project, // write-once setup intent (options.js); see state.js
 
-    entities: doc.entities.map(p => ({
+    entities: doc.entities.map(p => p.kind === 'foundation'
+      // Foundation is a derived entity: it carries params, not a module ref.
+      ? { id: p.id, kind: p.kind, layer: p.layer, level: p.level, params: p.params }
+      : {
       id: p.id,
       kind: p.kind,
       module: p.mod.id,
@@ -28,7 +31,7 @@ function serialize(includeMeta) {
       depth_mm: p.mod.depth_mm,
       ...(p.owner ? { owner: p.owner } : {}),
       ...(p.connections && p.connections.length > 0 ? { connections: p.connections } : {}),
-    })),
+    }),
   };
   if (includeMeta) {
     out.metadata = { exported: new Date().toISOString(), count: doc.entities.length };
@@ -84,6 +87,19 @@ export function loadLayout(event) {
     doc.entities.length = 0;
     ui.nextId = 0;
     for (const m of list) {
+      if (m.kind === 'foundation') {
+        // Derived entity — params only, no module. Geometry rebuilds from the
+        // L1 silhouette at render/BOM time.
+        doc.entities.push({
+          id: m.id || `foundation_${ui.nextId++}`,
+          kind: 'foundation',
+          layer: m.layer || 'foundation',
+          level: m.level || 'L1',
+          params: m.params || {},
+        });
+        ui.nextId++;
+        continue;
+      }
       const mod = ALL_MODULES.find(x => x.id === m.module);
       if (!mod) { console.warn(`Unknown module: ${m.module}`); continue; }
       doc.entities.push({

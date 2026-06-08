@@ -19,6 +19,7 @@ import { exportJSON, saveLayout, loadLayout } from './io.js';
 import { exportFcstd } from './fcstd.js';
 import { exportFabDrawings } from './render_fab.js';
 import { generateBuildSummary } from './render_summary.js';
+import { notifyFramingEdited } from './trades.js';
 
 const canvas = document.getElementById('design-canvas');
 
@@ -234,6 +235,7 @@ function setPlaceDir(dir) {
 // TOOLBAR ACTIONS
 // =====================================================
 function clearAll() {
+  notifyFramingEdited(); // clears any downstream foundation + drops to framing
   doc.entities.length = 0;
   history.length = 0;
   future.length = 0;
@@ -276,6 +278,7 @@ function undoLast() {
     doc.entities.splice(action.index, 0, action.module);
   }
   future.push(action);
+  notifyFramingEdited();
   markModelChanged();
 }
 
@@ -289,6 +292,7 @@ function redoLast() {
     if (idx >= 0) doc.entities.splice(idx, 1);
   }
   history.push(action);
+  notifyFramingEdited();
   markModelChanged();
 }
 
@@ -320,6 +324,7 @@ function findModuleAt(px_x, px_y) {
   const my = pxToMm(px_y - view.offsetY);
   for (let i = doc.entities.length - 1; i >= 0; i--) {
     const p = doc.entities[i];
+    if (p.kind === 'foundation') continue; // derived 3D-only object, not eraseable in 2D
     if (p.level !== doc.activeLevel) continue; // only active level — L1 ghosts on L2 are not eraseable
     const bb = getModuleBBox(p.mod, p.dir);
     if (mx >= p.x_mm && mx <= p.x_mm + bb.w &&
@@ -401,13 +406,14 @@ function flashReject(cx, cy) {
 // =====================================================
 let _preview3dOn = true;
 
-function switchTab(name) {
+// Switch the build-grid view (2D canvas vs 3D viewport). The trade rail buttons'
+// highlight is owned by trades.js (refreshTradeUI), not here. Exported so the
+// trade flow can drive the view per trade.
+export function switchTab(name) {
   ui.activeTab = name;
   const is3d = name === '3d';
   document.getElementById('canvas-wrap').style.display = is3d ? 'none' : 'block';
   document.getElementById('canvas3d-wrap').style.display = is3d ? 'block' : 'none';
-  document.getElementById('btn-tab-framing').classList.toggle('active', !is3d);
-  document.getElementById('btn-tab-3d').classList.toggle('active', is3d);
   if (is3d) {
     // Renderer moves to big viewport — enable regardless of sidebar toggle.
     set3dPreviewEnabled(true);
@@ -485,6 +491,7 @@ function wireCanvas() {
         const mod = doc.entities.splice(idx, 1)[0];
         history.push({ type: 'erase', module: mod, index: idx });
         future.length = 0;
+        notifyFramingEdited();
         markModelChanged();
       }
       return;
@@ -526,6 +533,7 @@ function wireCanvas() {
         history.push({ type: 'place', module: entity });
         future.length = 0;
         ui.snapTarget = null;
+        notifyFramingEdited();
         markModelChanged();
       }
     }
@@ -664,9 +672,8 @@ export function initUI() {
   document.getElementById('btn-modal-summary').addEventListener('click', () =>
     promptFilename('build-summary.html', (f) => closeAndExport(() => generateBuildSummary(f))));
 
-  // Tabs
-  document.getElementById('btn-tab-framing').addEventListener('click', () => switchTab('2d'));
-  document.getElementById('btn-tab-3d').addEventListener('click', () => switchTab('3d'));
+  // Trade rail buttons (FRAMING / FOUNDATION / 3D PREVIEW) are wired by
+  // trades.js (initTrades), which drives the view + render mode per trade.
 
   // Keep the big 3D viewport sized to its container.
   window.addEventListener('resize', () => { if (ui.activeTab === '3d') resize3d(); });

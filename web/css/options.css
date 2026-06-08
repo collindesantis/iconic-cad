@@ -168,3 +168,89 @@
   cursor: not-allowed;
   box-shadow: none;
 }
+
+/* =====================================================
+   FOUNDATION MODAL — autogen popup for the Foundation trade.
+   Reuses the .opt-field / .opt-sub structure; styled to match #options-modal.
+   ===================================================== */
+#foundation-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.78);
+  z-index: 2100;
+  align-items: center;
+  justify-content: center;
+}
+#foundation-modal.open { display: flex; }
+#foundation-modal-inner {
+  background: #16213e;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 24px;
+  width: 540px;
+  max-width: 92vw;
+  position: relative;
+  font-family: -apple-system, sans-serif;
+}
+#foundation-modal-inner h2 {
+  color: #eee;
+  font-size: 13px;
+  letter-spacing: 1px;
+  margin: 0 0 6px 0;
+  font-family: 'Space Mono', 'Courier New', monospace;
+}
+.fnd-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #111828;
+  border: 1px solid #3a5a8a;
+  border-radius: 4px;
+  color: #eee;
+  font-size: 13px;
+  padding: 8px 10px;
+  outline: none;
+}
+.fnd-input:focus { border-color: #4fc3f7; }
+.fnd-note { color: #557; font-size: 10px; margin-top: 5px; }
+.fnd-row { display: flex; gap: 12px; }
+.fnd-col { flex: 1; }
+.fnd-sub {
+  display: block; color: #7a8faa; font-size: 10px;
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;
+}
+/* Engineering warning — flashed when a field is edited off its autogen value */
+#fnd-warn {
+  display: none;
+  margin: 4px 0 12px;
+  padding: 10px 12px;
+  background: #3a2410;
+  border: 1px solid #8a5a1a;
+  border-radius: 6px;
+  color: #f0b860;
+  font-size: 11px;
+  line-height: 1.5;
+}
+#fnd-warn.show { display: block; }
+#fnd-go {
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px;
+  background: #2e7d32;
+  border: 1px solid #43a047;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  cursor: pointer;
+  font-family: 'Space Mono', 'Courier New', monospace;
+}
+#fnd-go:hover { background: #388e3c; }
+#fnd-go:disabled {
+  background: #2a2f3a;
+  border-color: #3a3f4a;
+  color: #667;
+  cursor: not-allowed;
+  box-shadow: none;
+}

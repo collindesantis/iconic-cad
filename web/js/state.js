@@ -91,6 +91,7 @@ export function resetDoc() {
   ui.dragState = null;
   ui.snapTarget = null;
   ui.eraseMode = false;
+  ui.activeTrade = 'framing';
 }
 
 // ---- View (camera over the 2D plan) --------------------------------------
@@ -117,6 +118,11 @@ export const ui = {
   placeDir: 'north',   // direction applied to a module picked in iso-library mode
   libMode: 'iso',      // 'iso' (one thumbnail + NESW selector) | 'icons' (4 per module)
   libCategory: 'walls', // library tab: 'walls' | 'windows' | 'doors' | 'interior'
+
+  // Trade flow (see trades.js). The fixed order is FRAMING → FOUNDATION → 3D
+  // PREVIEW; this only records WHERE the user is. Per-trade "done"-ness is
+  // DERIVED from the model (region enclosure / foundation entity), never stored.
+  activeTrade: 'framing', // 'framing' | 'foundation' | '3d'
 };
 
 // ---- Undo / redo ----------------------------------------------------------
