@@ -1,0 +1,113 @@
+{
+  "version": 2,
+  "units": "mm",
+  "levels": [
+    {
+      "id": "L1",
+      "name": "Level 1",
+      "z_mm": 0
+    }
+  ],
+  "entities": [
+    {
+      "id": "ls0",
+      "kind": "wall",
+      "module": "wall_4x8_2x6_16oc",
+      "direction": "south",
+      "x_mm": 0.0,
+      "y_mm": 0,
+      "width_mm": 1219.2,
+      "depth_mm": 150.8125
+    },
+    {
+      "id": "ls1",
+      "kind": "wall",
+      "module": "wall_4x8_2x6_16oc",
+      "direction": "south",
+      "x_mm": 1219.2,
+      "y_mm": 0,
+      "width_mm": 1219.2,
+      "depth_mm": 150.8125
+    },
+    {
+      "id": "ls2",
+      "kind": "wall",
+      "module": "wall_4x8_2x6_16oc",
+      "direction": "south",
+      "x_mm": 2438.4,
+      "y_mm": 0,
+      "width_mm": 1219.2,
+      "depth_mm": 150.8125
+    },
+    {
+      "id": "lnL0",
+      "kind": "wall",
+      "module": "wall_4x8_2x6_16oc",
+      "direction": "north",
+      "x_mm": 0.0,
+      "y_mm": 2589.2125,
+      "width_mm": 1219.2,
+      "depth_mm": 150.8125
+    },
+    {
+      "id": "lnL1",
+      "kind": "wall",
+      "module": "wall_4x8_2x6_16oc",
+      "direction": "north",
+      "x_mm": 1219.2,
+      "y_mm": 2589.2125,
+      "width_mm": 1219.2,
+      "depth_mm": 150.8125
+    },
+    {
+      "id": "lnR0",
+      "kind": "wall",
+      "module": "wall_4x8_2x6_16oc",
+      "direction": "north",
+      "x_mm": 2438.4,
+      "y_mm": 1370.0125,
+      "width_mm": 1219.2,
+      "depth_mm": 150.8125
+    },
+    {
+      "id": "lw0",
+      "kind": "wall",
+      "module": "wall_4x8_2x6_16oc",
+      "direction": "east",
+      "x_mm": 0,
+      "y_mm": 150.8125,
+      "width_mm": 1219.2,
+      "depth_mm": 150.8125
+    },
+    {
+      "id": "lw1",
+      "kind": "wall",
+      "module": "wall_4x8_2x6_16oc",
+      "direction": "east",
+      "x_mm": 0,
+      "y_mm": 1370.0125,
+      "width_mm": 1219.2,
+      "depth_mm": 150.8125
+    },
+    {
+      "id": "leB0",
+      "kind": "wall",
+      "module": "wall_4x8_2x6_16oc",
+      "direction": "west",
+      "x_mm": 3506.7875000000004,
+      "y_mm": 150.8125,
+      "width_mm": 1219.2,
+      "depth_mm": 150.8125
+    },
+    {
+      "id": "lstep0",
+      "kind": "wall",
+      "module": "wall_4x8_2x6_16oc",
+      "direction": "east",
+      "x_mm": 2287.5875,
+      "y_mm": 1370.0125,
+      "width_mm": 1219.2,
+      "depth_mm": 150.8125
+    }
+  ]
+}

@@ -14,7 +14,7 @@ import { IN_TO_MM, STUD_DEPTH, OSB_THICK } from './constants.js';
 import { enumerateMembers } from './members.js';
 import { panelHeightMM } from './designs.js';
 import { regionForLevel } from './region.js';
-import { getModuleBBox } from './geometry.js';
+import { foundationSolids } from './foundation_geom.js';
 
 // One revolution every ~35 s at 60 fps.
 const DEFAULT_SPEED = 2 * Math.PI / (35 * 60);
@@ -210,55 +210,29 @@ export function buildWall3D(mod, dir, xPos, yPos, zPos = 0) {
 }
 
 // Build the foundation's three.js meshes from its params + the L1 silhouette.
-// DERIVED (nothing baked on the entity): slab fills the region rects; the grade
-// beam + frost skirt trace each L1 exterior-wall footprint. Ground datum z=0 =
-// top of slab, so everything extrudes downward (center z negative). The skirt's
-// outside face is found by probing which side of the wall is NOT enclosed.
+// The geometry is DERIVED entirely by the shared pure module foundationSolids
+// (foundation_geom.js) — the same source of truth the FreeCAD exporter uses.
+// This function is now ONLY the render-side adapter: build the silhouette the
+// pure function needs, then map each piece → addBoxTo. Pieces are world plan mm,
+// z-DOWN (top of slab = z=0, centers negative); we apply the same min-origin
+// offset + Y-mirror as the walls (see buildWall3D). Concrete-gray slab/beam,
+// EPS-pink skirt.
 function buildFoundation3D(foundation, minX, minY) {
-  const p = foundation.params;
   const region = regionForLevel('L1');
-  const cell = region.cells ? region.cells.cell_mm : 76.2;
-  const probe = cell * 0.75; // ~¾ cell past a wall face — clear of the over-mark
-
-  // SLAB — fill the L1 silhouette (region.rects), extruded down from z=0.
-  for (const r of region.rects) {
-    addBoxTo(modelRoot, r.w_mm, r.h_mm, p.slab_thickness_mm,
-      r.x_mm - minX + r.w_mm / 2,
-      -(r.y_mm - minY + r.h_mm / 2),
-      -p.slab_thickness_mm / 2, matConcrete);
-  }
-
-  // Perimeter grade beam + frost skirt, one box each per L1 exterior wall.
   const l1Walls = doc.entities.filter(e => e.kind === 'wall' && (e.level || 'L1') === 'L1');
-  for (const w of l1Walls) {
-    const bb = getModuleBBox(w.mod, w.dir);
-    const horiz = bb.w >= bb.h;        // wall runs along X
-    const len = horiz ? bb.w : bb.h;
-    const cx = w.x_mm + bb.w / 2;      // footprint center (world plan mm)
-    const cy = w.y_mm + bb.h / 2;
+  const silhouette = {
+    rects: region.rects,
+    walls: l1Walls.map(w => ({ id: w.id, x_mm: w.x_mm, y_mm: w.y_mm, mod: w.mod, dir: w.dir })),
+    containsPoint: region.containsPoint,
+    cell_mm: region.cells ? region.cells.cell_mm : undefined,
+  };
 
-    // GRADE BEAM — along the run, beam_w across, beam_d deep, top at z=0.
-    addBoxTo(modelRoot,
-      horiz ? len : p.beam_w_mm,
-      horiz ? p.beam_w_mm : len,
-      p.beam_d_mm,
-      cx - minX, -(cy - minY), -p.beam_d_mm / 2, matConcrete);
-
-    // FROST SKIRT — thin EPS panel on the wall's OUTSIDE face. Outside = the side
-    // whose just-past-the-face probe is NOT inside the silhouette.
-    if (horiz) {
-      const topOut = !region.containsPoint(cx, w.y_mm - probe);
-      const fy = topOut ? w.y_mm - p.skirt_thickness_mm / 2
-                        : w.y_mm + bb.h + p.skirt_thickness_mm / 2;
-      addBoxTo(modelRoot, len, p.skirt_thickness_mm, p.skirt_depth_mm,
-        cx - minX, -(fy - minY), -p.skirt_depth_mm / 2, matEPS);
-    } else {
-      const leftOut = !region.containsPoint(w.x_mm - probe, cy);
-      const fx = leftOut ? w.x_mm - p.skirt_thickness_mm / 2
-                         : w.x_mm + bb.w + p.skirt_thickness_mm / 2;
-      addBoxTo(modelRoot, p.skirt_thickness_mm, len, p.skirt_depth_mm,
-        fx - minX, -(cy - minY), -p.skirt_depth_mm / 2, matEPS);
-    }
+  for (const pc of foundationSolids(foundation.params, silhouette)) {
+    const mat = pc.kind === 'skirt' ? matEPS : matConcrete;
+    addBoxTo(modelRoot, pc.dims.dx_mm, pc.dims.dy_mm, pc.dims.dz_mm,
+      pc.center.x_mm - minX,
+      -(pc.center.y_mm - minY), // scene Y is negated (see buildWall3D)
+      pc.center.z_mm, mat);
   }
 }
 

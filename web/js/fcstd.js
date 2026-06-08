@@ -14,6 +14,14 @@ import { doc } from './state.js';
 import { IN_TO_MM } from './constants.js';
 import { enumerateMembers } from './members.js';
 import { panelHeightMM } from './designs.js';
+import { regionForLevel } from './region.js';
+import { foundationSolids } from './foundation_geom.js';
+
+// Foundation ViewProvider colors (packed FreeCAD RGBA uint): concrete-gray
+// slab/beam, distinct EPS pink for the frost skirt — matches the 3D preview.
+const packColor = (r, g, b) => (((r << 24) | (g << 16) | (b << 8) | 0xff) >>> 0);
+const COL_CONCRETE = packColor(0x9a, 0x9a, 0x9a);
+const COL_EPS      = packColor(0xd9, 0x8c, 0xb3);
 
 const NOMINAL_TO_ACTUAL = {
   '2x2': [1.5, 1.5], '2x3': [1.5, 2.5], '2x4': [1.5, 3.5], '2x6': [1.5, 5.5],
@@ -160,17 +168,49 @@ function objBlock(name, label) {
                 <Property name="Shape" type="Part::PropertyPartShape"><Part file="${name}.brp"/><ElementMap/></Property>
         </Properties></Object>\n`;
 }
-function documentXml(objs) {
-  const deps = objs.map(o => `        <ObjectDeps Name="${o.name}" Count="0"/>\n`).join('');
-  const od = objs.map((o, i) => `        <Object type="Part::Feature" name="${o.name}" id="${2000 + i}" />\n`).join('');
-  const data = objs.map(o => objBlock(o.name, o.label)).join('');
+// A real FreeCAD tree folder (App::DocumentObjectGroup): its Group PropertyLinkList
+// references the child object names, so FreeCAD opens it as an expandable folder
+// (not flat name-prefixed solids). Format mirrors what FreeCAD itself writes
+// (GroupExtension + LinkList), trimmed to the properties FreeCAD needs to restore.
+function groupBlock(name, label, children) {
+  const links = children.map(c => `                    <Link value="${c}"/>`).join('\n');
+  return `        <Object name="${name}" Extensions="True">
+            <Extensions Count="1">
+                <Extension type="App::GroupExtension" name="GroupExtension"/>
+            </Extensions>
+            <Properties Count="3" TransientCount="0">
+                <Property name="Group" type="App::PropertyLinkList">
+                    <LinkList count="${children.length}">
+${links}
+                    </LinkList>
+                </Property>
+                <Property name="Label" type="App::PropertyString" status="134217728"><String value="${label}"/></Property>
+                <Property name="Visibility" type="App::PropertyBool" status="1"><Bool value="true"/></Property>
+            </Properties>
+        </Object>\n`;
+}
+
+// parts = [{name,label,brep,color?}]; groups = [{name,label,children:[name…]}].
+// Part::Feature objects are declared first, then the group folders that link
+// them (children must exist before the group that references them).
+function documentXml(parts, groups) {
+  const total = parts.length + groups.length;
+  const partDeps = parts.map(o => `        <ObjectDeps Name="${o.name}" Count="0"/>\n`).join('');
+  const groupDeps = groups.map(g =>
+    `        <ObjectDeps Name="${g.name}" Count="${g.children.length}">\n` +
+    g.children.map(c => `            <Dep Name="${c}"/>\n`).join('') +
+    `        </ObjectDeps>\n`).join('');
+  const partDecl = parts.map((o, i) => `        <Object type="Part::Feature" name="${o.name}" id="${2000 + i}" />\n`).join('');
+  const groupDecl = groups.map((g, i) => `        <Object type="App::DocumentObjectGroup" name="${g.name}" id="${2000 + parts.length + i}" />\n`).join('');
+  const partData = parts.map(o => objBlock(o.name, o.label)).join('');
+  const groupData = groups.map(g => groupBlock(g.name, g.label, g.children)).join('');
   return `<?xml version='1.0' encoding='utf-8'?>
 <Document SchemaVersion="4" FileVersion="1">
     <Properties Count="1" TransientCount="0"><Property name="Label" type="App::PropertyString" status="16777217"><String value="IconicCAD"/></Property></Properties>
-    <Objects Count="${objs.length}" Dependencies="0">
-${deps}${od}    </Objects>
-    <ObjectData Count="${objs.length}">
-${data}    </ObjectData>
+    <Objects Count="${total}" Dependencies="${groups.length}">
+${partDeps}${groupDeps}${partDecl}${groupDecl}    </Objects>
+    <ObjectData Count="${total}">
+${partData}${groupData}    </ObjectData>
 </Document>
 `;
 }
@@ -183,8 +223,9 @@ ${data}    </ObjectData>
 // for view direction (-1,-1,-1) with up +Z.
 const ISO_ORIENT = '0.1870 0.4516 0.8722  2.4476';
 function cameraSettings(b) {
-  const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2, cz = b.maxZ / 2;
-  const m = Math.max(b.maxX - b.minX, b.maxZ, 1000), k = m * 1.5;
+  const minZ = b.minZ || 0; // foundation extends below z=0; frame it too
+  const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2, cz = (minZ + b.maxZ) / 2;
+  const m = Math.max(b.maxX - b.minX, b.maxZ - minZ, 1000), k = m * 1.5;
   const focal = k * Math.sqrt(3);
   const L = [
     '#Inventor V2.1 ascii', '', '',
@@ -200,16 +241,29 @@ function cameraSettings(b) {
     '}', ''];
   return L.join('&#10;');
 }
-function guiDocumentXml(objs, bounds) {
-  const vps = objs.map(o => `        <ViewProvider name="${o.name}" expanded="0">
-            <Properties Count="1" TransientCount="0">
-                <Property name="Visibility" type="App::PropertyBool"><Bool value="true"/></Property>
+// One ViewProvider per object. Visibility=true always; foundation pieces also
+// carry a ShapeColor (concrete-gray / EPS-pink) so the slab/beam/skirt read
+// distinctly. Group folders get a ViewProvider too (visibility only).
+function viewProvider(name, color) {
+  const hasColor = color != null;
+  const colorProp = hasColor ? `
+                <Property name="ShapeColor" type="App::PropertyColor">
+                    <PropertyColor value="${color}"/>
+                </Property>` : '';
+  return `        <ViewProvider name="${name}" expanded="0">
+            <Properties Count="${hasColor ? 2 : 1}" TransientCount="0">
+                <Property name="Visibility" type="App::PropertyBool"><Bool value="true"/></Property>${colorProp}
             </Properties>
-        </ViewProvider>\n`).join('');
+        </ViewProvider>\n`;
+}
+function guiDocumentXml(parts, groups, bounds) {
+  const total = parts.length + groups.length;
+  const vps = parts.map(o => viewProvider(o.name, o.color)).join('')
+            + groups.map(g => viewProvider(g.name)).join('');
   return `<?xml version='1.0' encoding='utf-8'?>
 <!DOCTYPE GuiDocument>
 <Document SchemaVersion="1">
-    <ViewProviderData Count="${objs.length}">
+    <ViewProviderData Count="${total}">
 ${vps}    </ViewProviderData>
     <Camera settings="${cameraSettings(bounds)}"/>
 </Document>
@@ -225,14 +279,18 @@ async function libBrep(modId, dir) {
 
 // Exposed for the node verification harness (not used by the app).
 export const _test = {
-  translateBrep, createBlocking, documentXml, objBlock,
+  translateBrep, createBlocking, documentXml, objBlock, groupBlock, guiDocumentXml,
   boxBrep: (dx, dy, dz, tx, ty, tz, tmpl) => { BOX_TEMPLATE = tmpl; return boxBrep(dx, dy, dz, tx, ty, tz); },
   setWallSpecs: (s) => { WALL_SPECS = s; },
 };
 
+// Capitalize a trade key for the folder label ('framing' -> 'Framing').
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+// Folder label for a level-aware trade: 'L1' -> 'Level_1', 'L2' -> 'Level_2'.
+const levelLabel = lvl => `Level_${String(lvl).replace(/^L/, '')}`;
+
 export async function exportFcstd(filename = 'house.FCStd') {
-  // Framing entities only — the foundation is a derived 3D-review object and is
-  // not part of the FreeCAD framing export.
+  // Framing entities; the foundation is the derived entity (params only).
   const ents = doc.entities.filter(e => e.kind === 'wall' || e.kind === 'iwall');
   if (ents.length === 0) { alert('Place some modules first.'); return; }
   const l1Ents = ents.filter(e => (e.level || 'L1') === 'L1');
@@ -245,14 +303,18 @@ export async function exportFcstd(filename = 'house.FCStd') {
   // though the rest of the page is up to date. The files are tiny.
   if (!WALL_SPECS) WALL_SPECS = await (await fetch('assets/lib/specs.json', { cache: 'reload' })).json();
   if (!BOX_TEMPLATE) BOX_TEMPLATE = await (await fetch('assets/box_template.brp', { cache: 'reload' })).text();
+  // Preload every wall BREP so the (sync) trade producers below can build solids
+  // without awaiting per-piece.
+  for (const e of ents) await libBrep(e.mod.id, e.dir);
 
   const minx = Math.min(...ents.map(e => e.x_mm));
   const miny = Math.min(...ents.map(e => e.y_mm));
   const byId = {}; for (const e of ents) byId[e.id] = e;
 
   // Model bounds (mm), Y already mirrored to match the exported geometry, for
-  // the GuiDocument.xml camera framing.
-  const bounds = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity, maxZ: 0 };
+  // the GuiDocument.xml camera framing. minZ starts at 0 and is pushed negative
+  // by the foundation producer so the camera frames everything below grade too.
+  const bounds = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity, minZ: 0, maxZ: 0 };
   for (const e of ents) {
     const x0 = e.x_mm - minx, yb = e.y_mm - miny, dp = e.mod.depth_mm;
     const ft = (e.mod.aperture && e.mod.aperture.height_ft) || (e.mod.id.includes('8.5') ? 8.5 : 8);
@@ -261,34 +323,96 @@ export async function exportFcstd(filename = 'house.FCStd') {
     bounds.maxZ = Math.max(bounds.maxZ, ez(e) + ft * 12 * IN_TO_MM);
   }
 
-  const objs = []; let bi = 0;
-  for (let i = 0; i < ents.length; i++) {
-    const e = ents[i];
-    const tmpl = await libBrep(e.mod.id, e.dir);
-    // Library solids are pre-mirrored to Y in [-extent, 0] (bake_geometry), so a
-    // plain translation by -(y-miny) lands them in the Y-up world. Blocking
-    // boxes are still built canonical at Y in [0, dy], so mirror their corner to
-    // [-ty-dy, -ty] (a box is symmetric, so position is all that's needed).
-    objs.push({ name: `Wall${i}`, label: `wall_${String(i).padStart(2, '0')}_${e.id}`,
-                brep: translateBrep(tmpl, e.x_mm - minx, -(e.y_mm - miny), ez(e)) });
-    for (const conn of (e.connections || [])) {
-      for (const [dx, dy, dz, tx, ty, tz] of createBlocking(conn, byId, minx, miny)) {
-        objs.push({ name: `Blk${bi}`, label: `blocking_${String(bi).padStart(2, '0')}_${conn.blocking || 'C'}`,
-                    brep: boxBrep(dx, dy, dz, tx, -ty - dy, tz + ez(e)) });
-        bi++;
+  // ---- Trade-agnostic export registry (§2) --------------------------------
+  // Each producer yields labeled Part objects {name,label,brep,color?}. A
+  // level-aware trade emits one folder per level (Framing_Level_1, …); a
+  // level-agnostic trade emits one folder (Foundation). Adding a future trade =
+  // add a registry entry; no other exporter edits.
+  let wallN = 0, blkN = 0, fndN = 0;
+
+  // FRAMING — wraps the EXISTING wall/blocking BREP emission, per level.
+  function framingObjs(level) {
+    const out = [];
+    for (const e of ents) {
+      if ((e.level || 'L1') !== level) continue;
+      // Library solids are pre-mirrored to Y in [-extent, 0] (bake_geometry), so
+      // a plain translation by -(y-miny) lands them in the Y-up world. Blocking
+      // boxes are built canonical at Y in [0, dy], so mirror their corner to
+      // [-ty-dy, -ty] (a box is symmetric, so position is all that's needed).
+      out.push({ name: `Wall${wallN}`, label: `wall_${String(wallN).padStart(2, '0')}_${e.id}`,
+                 brep: translateBrep(brepCache[`${e.mod.id}__${e.dir}`], e.x_mm - minx, -(e.y_mm - miny), ez(e)) });
+      wallN++;
+      for (const conn of (e.connections || [])) {
+        for (const [dx, dy, dz, tx, ty, tz] of createBlocking(conn, byId, minx, miny)) {
+          out.push({ name: `Blk${blkN}`, label: `blocking_${String(blkN).padStart(2, '0')}_${conn.blocking || 'C'}`,
+                     brep: boxBrep(dx, dy, dz, tx, -ty - dy, tz + ez(e)) });
+          blkN++;
+        }
       }
+    }
+    return out;
+  }
+
+  // FOUNDATION — shared pure derivation (foundation_geom.js), the same source
+  // of truth as the 3D preview. Each piece is a labeled box; pieces sit at z<=0.
+  function foundationObjs() {
+    const f = doc.entities.find(e => e.kind === 'foundation');
+    if (!f) return [];
+    const region = regionForLevel('L1');
+    const fl1Walls = ents.filter(e => e.kind === 'wall' && (e.level || 'L1') === 'L1');
+    const silhouette = {
+      rects: region.rects,
+      walls: fl1Walls.map(w => ({ id: w.id, x_mm: w.x_mm, y_mm: w.y_mm, mod: w.mod, dir: w.dir })),
+      containsPoint: region.containsPoint,
+      cell_mm: region.cells ? region.cells.cell_mm : undefined,
+    };
+    const out = [];
+    for (const pc of foundationSolids(f.params, silhouette)) {
+      const { dx_mm: dx, dy_mm: dy, dz_mm: dz } = pc.dims;
+      const fx = pc.center.x_mm - minx;          // same world->FreeCAD transform
+      const fy = -(pc.center.y_mm - miny);       // as the walls; boxes are symmetric
+      const fz = pc.center.z_mm;
+      out.push({ name: `Fnd${fndN}`, label: `foundation_${pc.label}`,
+                 brep: boxBrep(dx, dy, dz, fx - dx / 2, fy - dy / 2, fz - dz / 2),
+                 color: pc.kind === 'skirt' ? COL_EPS : COL_CONCRETE });
+      fndN++;
+      // grow the camera frame to include this below-grade box
+      bounds.minX = Math.min(bounds.minX, fx - dx / 2); bounds.maxX = Math.max(bounds.maxX, fx + dx / 2);
+      bounds.minY = Math.min(bounds.minY, fy - dy / 2); bounds.maxY = Math.max(bounds.maxY, fy + dy / 2);
+      bounds.minZ = Math.min(bounds.minZ, fz - dz / 2);
+    }
+    return out;
+  }
+
+  const TRADES = [
+    { trade: 'framing',    levelAware: true,  solids: framingObjs },
+    { trade: 'foundation', levelAware: false, solids: foundationObjs },
+  ];
+  const levelsPresent = [...new Set(ents.map(e => e.level || 'L1'))];
+
+  const parts = [], groups = [];
+  for (const t of TRADES) {
+    const emit = (objs, gname) => {
+      if (!objs.length) return;
+      parts.push(...objs);
+      groups.push({ name: gname, label: gname, children: objs.map(o => o.name) });
+    };
+    if (t.levelAware) {
+      for (const lvl of levelsPresent) emit(t.solids(lvl), `${cap(t.trade)}_${levelLabel(lvl)}`);
+    } else {
+      emit(t.solids(), cap(t.trade));
     }
   }
 
   const { default: JSZip } = await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm');
   const zip = new JSZip();
-  zip.file('Document.xml', documentXml(objs));
+  zip.file('Document.xml', documentXml(parts, groups));
   // FreeCAD is sensitive to member order here: if GuiDocument.xml is restored
   // before the Part sidecar BREPs, GUI view providers can come up visible but
   // with no drawable shape in the viewport. FreeCAD-written FCStd files place
   // the shape payloads before GuiDocument.xml; keep that order.
-  for (const o of objs) zip.file(`${o.name}.brp`, o.brep);
-  zip.file('GuiDocument.xml', guiDocumentXml(objs, bounds));
+  for (const o of parts) zip.file(`${o.name}.brp`, o.brep);
+  zip.file('GuiDocument.xml', guiDocumentXml(parts, groups, bounds));
   const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

@@ -22,6 +22,13 @@ import zipfile
 
 import yaml
 
+# Repo root on sys.path so `foundation_lib` imports whether this script is run
+# directly or via `exec(open(...).read())` under freecadcmd (which leaves cwd off
+# the path). foundation_lib lives beside this file at the repo root.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals()
+                else os.getcwd())
+from foundation_lib import foundation_solids, silhouette_for_walls
+
 try:
     import FreeCAD as App
     import Part  # noqa: F401
@@ -409,9 +416,18 @@ def main():
     with open(json_path) as f:
         data = json.load(f)
 
-    modules = data.get("entities") or data.get("modules") or []
-    if not modules:
+    all_entities = data.get("entities") or data.get("modules") or []
+    if not all_entities:
         print("Error: no entities/modules in layout JSON")
+        sys.exit(1)
+
+    # Framing entities (walls + interior walls). The foundation is a DERIVED
+    # entity (params only, no module ref) handled by the foundation trade below;
+    # every wall-loop consumer must skip kind=='foundation' (it has no x_mm).
+    modules = [m for m in all_entities if m.get("kind") != "foundation"]
+    foundation_ent = next((m for m in all_entities if m.get("kind") == "foundation"), None)
+    if not modules:
+        print("Error: no framing entities in layout JSON")
         sys.exit(1)
 
     # Load YAML specs for blocking calculations
@@ -437,6 +453,20 @@ def main():
 
     doc = App.newDocument("HouseAssembly")
 
+    # ---- Trade-agnostic grouping (mirrors web/js export registry §2) ----------
+    # Real FreeCAD tree folders (App::DocumentObjectGroup): framing is level-aware
+    # (Framing_Level_1, Framing_Level_2); foundation is its own folder. Adding a
+    # future trade = add a producer + its group, no other compiler changes.
+    framing_groups = {}
+
+    def framing_group(level):
+        if level not in framing_groups:
+            name = "Framing_Level_2" if level == "L2" else "Framing_Level_1"
+            g = doc.addObject("App::DocumentObjectGroup", name)
+            g.Label = name
+            framing_groups[level] = g
+        return framing_groups[level]
+
     blocking_idx = 0
 
     for i, m in enumerate(modules):
@@ -453,6 +483,7 @@ def main():
         obj.Shape = shape
         if obj.ViewObject:
             obj.ViewObject.Visibility = True
+        framing_group(m.get("level", "L1")).addObject(obj)
 
         print(f"Placed {name} ({m['direction']}) at ({x:.1f}, {y:.1f})")
 
@@ -470,11 +501,43 @@ def main():
                 bobj.Shape = bs
                 if bobj.ViewObject:
                     bobj.ViewObject.Visibility = True
+                framing_group(m.get("level", "L1")).addObject(bobj)
                 blocking_idx += 1
 
             if blocking_shapes:
                 print(f"  Added {len(blocking_shapes)} blocking pieces "
                       f"({conn.get('blocking', 'C')}) at target {conn['target_id']}")
+
+    # ---- Foundation trade -----------------------------------------------------
+    # Derived from the L1 silhouette + the entity's params via the shared Python
+    # port (foundation_lib, parity-tested against the browser). Each piece is a
+    # rectangular Part box placed at z<=0 (below the framing). Same world->FreeCAD
+    # transform as the walls: plan (X,Y) -> (X-min_x, -(Y-min_y)); boxes are
+    # symmetric so a plain placement (no mirror_y) lands them correctly.
+    if foundation_ent and foundation_ent.get("params"):
+        l1_walls = [m for m in modules
+                    if m.get("kind") == "wall" and m.get("level", "L1") == "L1"]
+        if l1_walls:
+            fgroup = doc.addObject("App::DocumentObjectGroup", "Foundation")
+            fgroup.Label = "Foundation"
+            silhouette = silhouette_for_walls(l1_walls)
+            pieces = foundation_solids(foundation_ent["params"], silhouette)
+            for pc in pieces:
+                dx, dy, dz = pc["dims"]["dx_mm"], pc["dims"]["dy_mm"], pc["dims"]["dz_mm"]
+                fx = pc["center"]["x_mm"] - min_x
+                fy = -(pc["center"]["y_mm"] - min_y)
+                fz = pc["center"]["z_mm"]
+                box = Part.makeBox(dx, dy, dz)
+                box.translate(App.Vector(fx - dx / 2, fy - dy / 2, fz - dz / 2))
+                name = f"foundation_{pc['label']}"
+                fobj = doc.addObject("Part::Feature", name)
+                fobj.Shape = box
+                fobj.Label = name
+                if fobj.ViewObject:
+                    fobj.ViewObject.Visibility = True
+                fgroup.addObject(fobj)
+            print(f"Foundation: {len(pieces)} pieces "
+                  f"({len(silhouette['rects'])} slab rects)")
 
     doc.recompute()
     out = os.path.splitext(json_path)[0] + ".FCStd"
