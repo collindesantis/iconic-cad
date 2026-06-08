@@ -35,6 +35,7 @@ test:
     - node tests/project_shape.mjs
     - node tests/fcstd_local_jszip.mjs
     - node tests/ci_verify_gate.mjs
+    - node tests/export_gate.mjs
     # CAD-AUD-009 gate: committed BREP assets must not drift from the generator
     # (browser FreeCAD export translates pre-baked BREPs, not enumerateMembers()).
     - apt-get install -y -qq freecad

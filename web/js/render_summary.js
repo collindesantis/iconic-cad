@@ -21,7 +21,7 @@ import {
 } from './designs.js';
 import { cutListGrouped, aggregateLineItems, getCatalog } from './bom.js';
 import {
-  cardSVG, buildBookHTML, downloadText, openPrintWindow,
+  cardSVG, buildBookHTML, downloadText, openPrintWindow, framingPackBanner,
   loadCardTemplates, instanceMaterials,
 } from './render_fab.js';
 
@@ -311,7 +311,7 @@ export async function generateBuildSummary(filename) {
     });
   }
 
-  const html = buildBookHTML(sheets, 'Iconic CAD — Build Summary');
+  const html = buildBookHTML(sheets, 'Iconic CAD — Build Summary', framingPackBanner());
   downloadText(html, filename || 'build-summary.html', 'text/html');
   openPrintWindow(html);
 }

@@ -15,6 +15,7 @@ import { enumerateMembers } from './members.js';
 import { IN_TO_MM, STUD_THICK } from './constants.js';
 import { doc } from './state.js';
 import { cutListGrouped } from './bom.js';
+import { shellEnclosed } from './export_gate.js';
 import {
   esc, f2, inFrac, ftInLabel, lumberStyle, SHEATH_DEFS, SHEET_CSS,
   panelHeightMM, bayFaces, studLayoutIn, designIdFor, archetypeOf,
@@ -346,7 +347,14 @@ export function cardSVG(entity, opts = {}) {
 // =====================================================
 // A sheet is { label, title?, sections:[{type,svg}], fullpage? }. Generalised
 // so both the fab book and the build-summary packet feed the same composer.
-export function buildBookHTML(sheets, docTitle = 'Iconic CAD — Fab Drawings') {
+// banner (optional): { label, warn } — a scope label (e.g. "FRAMING-ONLY PACK")
+// and an optional warning line shown at the top of the book and in print, so an
+// incomplete export is never presented as a finished house. (CAD-AUD-008)
+export function buildBookHTML(sheets, docTitle = 'Iconic CAD — Fab Drawings', banner = null) {
+  const bannerHTML = banner ? `
+  <div class="export-banner">
+    <strong>${esc(banner.label)}</strong>${banner.warn ? ` — ${esc(banner.warn)}` : ''}
+  </div>` : '';
   const sheetHTML = sheets.map(sh => `
     <div class="panel-sheet${sh.fullpage ? ' fullpage' : ''}">
       ${sh.title === null ? '' : `<h2>${esc(sh.title || sh.label)}</h2>`}
@@ -360,14 +368,18 @@ export function buildBookHTML(sheets, docTitle = 'Iconic CAD — Fab Drawings') 
   h2 { font-size: 13px; color: #444; margin: 0 0 8px; }
   .panel-sheet { margin-bottom: 32px; }
   .section svg { max-width: 100%; height: auto; }
+  .export-banner { border: 2px solid #c1440e; background: #fff3ec; color: #7a2d0a;
+    padding: 8px 12px; margin: 0 0 18px; font-size: 12px; border-radius: 4px; }
   @media print {
     body { margin: 0; }
     h1 { display: none; }
+    .export-banner { display: block; }
     .panel-sheet { page-break-after: always; margin: 0; padding: 12px; }
   }
 </style></head>
 <body>
   <h1>${esc(docTitle)}</h1>
+  ${bannerHTML}
   ${sheetHTML}
 </body></html>`;
 }
@@ -408,10 +420,21 @@ export async function exportFabDrawings(filename) {
   const templates = await loadCardTemplates();
   const sheets = buildSheets(panels, templates);
 
+  // Fab drawings are always a framing-only pack; warn if the shell isn't closed.
+  const banner = framingPackBanner();
+
   if (panels.length === 1) {
     downloadText(sheets[0].sections[0].svg, `fab-${sheets[0].label}.svg`, 'image/svg+xml');
   } else {
-    downloadText(buildBookHTML(sheets), filename || 'fab-drawings.html', 'text/html');
+    downloadText(buildBookHTML(sheets, 'Iconic CAD — Fab Drawings', banner), filename || 'fab-drawings.html', 'text/html');
   }
-  openPrintWindow(buildBookHTML(sheets));
+  openPrintWindow(buildBookHTML(sheets, 'Iconic CAD — Fab Drawings', banner));
+}
+
+// The framing-only scope label shared by fab drawings and the build summary.
+export function framingPackBanner() {
+  return {
+    label: 'FRAMING-ONLY PACK',
+    warn: shellEnclosed() ? '' : 'shell is not yet a closed silhouette — review before building.',
+  };
 }

@@ -39,6 +39,7 @@ jobs:
           node tests/project_shape.mjs
           node tests/fcstd_local_jszip.mjs
           node tests/ci_verify_gate.mjs
+          node tests/export_gate.mjs
 
       - name: Install FreeCAD (for BREP geometry verify)
         run: sudo apt-get update && sudo apt-get install -y freecad

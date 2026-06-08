@@ -14,6 +14,7 @@ import { findSnap, wouldOverlap } from './snap.js';
 import { regionForLevel } from './region.js';
 import { markModelChanged, requestDraw } from './app.js';
 import { resizeCanvas } from './render2d.js';
+import { houseExportReady } from './export_gate.js';
 import { setViewport, resize3d, set3dPreviewEnabled } from './render3d.js';
 import { cardHover, cardLeave } from './card_preview3d.js';
 import { exportJSON, saveLayout, loadLayout } from './io.js';
@@ -707,8 +708,14 @@ export function initUI() {
 
   function closeAndExport(fn) { exportModal.classList.remove('open'); fn(); }
 
-  document.getElementById('btn-modal-fcstd').addEventListener('click', () =>
-    promptFilename('house.FCStd', (f) => closeAndExport(() => exportFcstd(f))));
+  document.getElementById('btn-modal-fcstd').addEventListener('click', () => {
+    // A house.FCStd is only a real house once the foundation trade is done.
+    // Otherwise warn it will be framing-only before emitting (CAD-AUD-008).
+    if (!houseExportReady() && !window.confirm(
+      'No completed foundation yet — this FreeCAD export will be FRAMING-ONLY, ' +
+      'not a full house (no foundation/floor system). Export anyway?')) return;
+    promptFilename('house.FCStd', (f) => closeAndExport(() => exportFcstd(f)));
+  });
   document.getElementById('btn-modal-export-json').addEventListener('click', () =>
     promptFilename('layout.json', (f) => closeAndExport(() => exportJSON(f))));
   document.getElementById('btn-modal-fab').addEventListener('click', () =>

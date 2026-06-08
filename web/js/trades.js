@@ -21,6 +21,7 @@ import { switchTab } from './ui.js';
 import { setRenderMode, resize3d, setFoundationLayerVisible } from './render3d.js';
 import { openFoundationModal } from './foundation.js';
 import { markModelChanged } from './app.js';
+import { shellEnclosed } from './export_gate.js';
 
 export const TRADES = ['framing', 'foundation', '3d'];
 
@@ -33,15 +34,12 @@ const NEXT_HINT = {
 const EDIT_LABEL = { framing: 'EDIT', foundation: 'REGENERATE' };
 
 // ---- Derived done-conditions ---------------------------------------------
+// Every required story is a closed silhouette. Identical to the export gate's
+// shellEnclosed() — one source, so the trade gate and the framing-pack warning
+// can never disagree. (A 2-story project must have an ENCLOSED Story 2, not just
+// an enclosed Story 1; shellEnclosed() forces L2 into the required set.)
 export function framingDone() {
-  const levels = [...new Set(doc.entities.filter(e => e.kind === 'wall').map(e => e.level || 'L1'))];
-  // A 2-story project must have a real, ENCLOSED Story 2 — not just an enclosed
-  // Story 1 (which is only what unlocks L2). Force L2 into the required set so
-  // finishing L1 and placing zero L2 walls cannot pass the gate. regionForLevel
-  // with no L2 walls returns isEnclosed=false → blocked.
-  if (doc.project.stories === 2 && !levels.includes('L2')) levels.push('L2');
-  if (!levels.length) return false;
-  return levels.every(l => regionForLevel(l).isEnclosed);
+  return shellEnclosed();
 }
 export function foundationDone() {
   return doc.entities.some(e => e.kind === 'foundation');
