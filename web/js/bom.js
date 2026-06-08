@@ -27,14 +27,34 @@ export async function loadPricing() {
 const STUD_ROLES = new Set(['stud', 'king', 'jack', 'top_cripple', 'lower_cripple']);
 const PLATE_ROLES = new Set(['bottom_plate', 'top_plate', 'sill', 'subheader', 'sill_block']);
 
+// Stock board lengths (ft) carried per nominal, ascending. Stud and header
+// stock is bought in the smallest board that covers the cut length.
+const STOCK_LENGTHS = {
+  '2x4': [8, 10], '2x6': [8, 10, 12],
+  '2x8': [10, 12, 16], '2x10': [10, 12, 16], '2x12': [10, 12, 16],
+};
+
+// Pick the smallest stock board (by nominal) that covers a cut of lengthIn.
+// Falls back to the longest carried length if nothing covers it.
+export function pickStock(nominal, lengthIn) {
+  const lenFt = lengthIn / 12;
+  const opts = STOCK_LENGTHS[nominal] || [8];
+  const ft = opts.find(o => o + 1e-6 >= lenFt) ?? opts[opts.length - 1];
+  return `${nominal}_${ft}ft`;
+}
+
 // Map one framing member to its catalog stock key.
-function stockKeyFor(m, is2x4, plateLenFt) {
+export function stockKeyFor(m, is2x4, plateLenFt) {
   if (PLATE_ROLES.has(m.role)) {
     return is2x4 ? (plateLenFt <= 4 ? '2x4_8ft' : '2x4_10ft')
                  : (plateLenFt <= 4 ? '2x6_8ft' : '2x6_12ft');
   }
-  if (m.role === 'header') return m.nominal; // TODO: catalog lacks 2x8/2x12 header stock; priced 0 until added
-  return is2x4 ? '2x4_8ft' : '2x6_8ft'; // stud-like
+  // Headers: buy 2x8/2x10/2x12 stock by actual span (was returning a bare nominal
+  // key that the catalog lacked, pricing every header at $0).
+  if (m.role === 'header') return pickStock(m.nominal, m.length_mm / IN_TO_MM);
+  // Stud-like: select by actual cut length, not a flat 8ft (a 117" king stud is
+  // 9.75ft and must buy 10ft stock, not be miscounted as an 8ft 2x6).
+  return pickStock(is2x4 ? '2x4' : '2x6', m.length_mm / IN_TO_MM);
 }
 
 // The ONE adapter that knows about "members". Everything downstream is generic.

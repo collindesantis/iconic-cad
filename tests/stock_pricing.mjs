@@ -1,0 +1,40 @@
+/**
+ * CAD-AUD-006 regression: stock selection is length-aware and every header
+ * material key resolves to a nonzero price.
+ *
+ * Run from repo root: node tests/stock_pricing.mjs   (no FreeCAD needed)
+ */
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { stockKeyFor } from '../web/js/bom.js';
+import { enumerateMembers } from '../web/js/members.js';
+import { APERTURE_MODULES, INT_APERTURE_MODULES, IN_TO_MM } from '../web/js/constants.js';
+
+const pricing = JSON.parse(readFileSync(fileURLToPath(new URL('../web/pricing.json', import.meta.url))));
+const catalog = { ...pricing.lumber, ...pricing.hardware };
+
+let passed = 0, failed = 0;
+const fail = m => { console.error(`  FAIL ${m}`); failed++; };
+const ok = m => { passed++; if (process.env.VERBOSE) console.log(`  ok ${m}`); };
+
+// 1. A 117" (9.75ft) king stud must NOT map to an 8ft key.
+const king = { role: 'king', nominal: '2x6', length_mm: 117 * IN_TO_MM };
+const kkey = stockKeyFor(king, false, 4);
+if (kkey === '2x6_8ft') fail(`117" king stud mapped to ${kkey} (should be >=10ft)`);
+else ok(`117" king -> ${kkey}`);
+if (kkey !== '2x6_10ft') fail(`117" king expected 2x6_10ft, got ${kkey}`);
+else ok('117" king -> 2x6_10ft');
+
+// 2. Every header member across every aperture module prices nonzero.
+for (const mod of [...APERTURE_MODULES, ...INT_APERTURE_MODULES]) {
+  const is2x4 = !!mod.interior;
+  for (const m of enumerateMembers(mod).filter(x => x.role === 'header')) {
+    const key = stockKeyFor(m, is2x4, 4);
+    const price = catalog[key] && catalog[key].unit_price;
+    if (price > 0) ok(`${mod.id} header ${m.nominal} -> ${key} @ $${price}`);
+    else fail(`${mod.id} header ${m.nominal} -> ${key} prices ${price}`);
+  }
+}
+
+console.log(`\n${passed} passed, ${failed} failed`);
+process.exit(failed ? 1 : 0);

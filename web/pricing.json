@@ -5,7 +5,16 @@
     "2x6_12ft": { "description": "2x6 x 12' plate", "unit_price": 9.98, "unit": "each" },
     "osb_7_16_4x8": { "description": "7/16\" OSB 4x8 sheet", "unit_price": 12.50, "unit": "sheet" },
     "2x4_8ft": { "description": "2x4 x 8' stud", "unit_price": 3.18, "unit": "each" },
-    "2x4_10ft": { "description": "2x4 x 10' plate/stud", "unit_price": 4.48, "unit": "each" }
+    "2x4_10ft": { "description": "2x4 x 10' plate/stud", "unit_price": 4.48, "unit": "each" },
+    "2x8_10ft": { "description": "2x8 x 10' header", "unit_price": 11.00, "unit": "each", "todo": "confirm price" },
+    "2x8_12ft": { "description": "2x8 x 12' header", "unit_price": 13.50, "unit": "each", "todo": "confirm price" },
+    "2x8_16ft": { "description": "2x8 x 16' header", "unit_price": 18.00, "unit": "each", "todo": "confirm price" },
+    "2x10_10ft": { "description": "2x10 x 10' header", "unit_price": 14.00, "unit": "each", "todo": "confirm price" },
+    "2x10_12ft": { "description": "2x10 x 12' header", "unit_price": 17.00, "unit": "each", "todo": "confirm price" },
+    "2x10_16ft": { "description": "2x10 x 16' header", "unit_price": 23.00, "unit": "each", "todo": "confirm price" },
+    "2x12_10ft": { "description": "2x12 x 10' header", "unit_price": 17.00, "unit": "each", "todo": "confirm price" },
+    "2x12_12ft": { "description": "2x12 x 12' header", "unit_price": 21.00, "unit": "each", "todo": "confirm price" },
+    "2x12_16ft": { "description": "2x12 x 16' header", "unit_price": 28.00, "unit": "each", "todo": "confirm price" }
   },
   "hardware": {
     "nail_16d_sinker": { "description": "16d sinker nail (3-1/4\")", "unit_price": 0.08, "unit": "each" },
