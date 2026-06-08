@@ -142,7 +142,13 @@ export function foundationSolids(params, silhouette) {
   const walls = silhouette.walls || [];
   const containsPoint = silhouette.containsPoint;
   const cell = silhouette.cell_mm || DEFAULT_CELL_MM;
-  const probe = cell * 0.75; // ~¾ cell past a wall face — clear of the over-mark
+  // Probe 2 cells past the near face. The region grid marks WALL for any cell
+  // that overlaps a wall footprint, which over-marks by up to 1 full cell beyond
+  // the real outer face. A ¾-cell probe can land in that over-mark band and read
+  // as "not exterior" — flipping the skirt to the wrong face. 2 cells reliably
+  // clears the ≤1-cell over-mark with margin; the probe still lands correctly
+  // in the interior for inner-edge runs (farther than 2 cells from any exterior).
+  const probe = cell * 2;
 
   const pieces = [];
 
@@ -176,14 +182,16 @@ export function foundationSolids(params, silhouette) {
   // whose just-past-the-face probe is NOT inside the silhouette), skirt_thickness
   // thick, skirt_depth deep, top at z=0.
   //
-  // CORNER-EXTENSION RULE (this is what makes the FPSF loop gapless): grow each
-  // panel past BOTH ends of its run by the perpendicular run's wall depth
-  // (≈ wall depth, uniform here). At an exterior corner the perpendicular run's
-  // skirt sits skirt_thickness outside its wall, ending ~flush with this run's
-  // wall line; extending THIS panel by a full wall depth makes it sweep across
-  // and fully cover the corner square — so adjacent skirts overlap with NO gap.
-  // Runs tile the perimeter face-by-face, so every panel end is a corner (the
-  // extension fills it) — never a free end stranded in open air.
+  // CORNER-EXTENSION RULE (makes the FPSF loop gapless with no stubs): grow each
+  // panel past BOTH ends of its run by the run's own wall depth. Why depth and
+  // not just skirtT: each run's a-axis end aligns with either the near or far
+  // face of the adjacent perpendicular wall (not a fixed offset). Extending by
+  // depth guarantees the panel reaches at least to the adjacent wall's outer
+  // face — for the "short" ends (aligned with the far face) the extension spans
+  // one full wall depth bridging to the adjacent skirt, while horizontal runs
+  // compensate by covering the corner pocket. Together adjacent skirt pairs
+  // leave NO uncovered ground near any convex exterior corner. Re-entrant corners
+  // (L-shape notch) see a small stub under the slab, which is harmless insulation.
   for (const r of runs) {
     const len = r.aMax - r.aMin;
     const axisC = (r.aMin + r.aMax) / 2;

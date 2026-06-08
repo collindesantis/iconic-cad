@@ -120,6 +120,25 @@ for (const [name, want] of Object.entries(golden)) {
   const errs = [];
   // structural contract (exact run counts + gapless skirt loop) on the JS output
   errs.push(...structuralErrors(name, got));
+
+  // OUTSIDE assertion: every skirt must sit on the exterior. A skirt placed on
+  // the wrong face (probe bug) has its center inside the building. Probe ±cell in
+  // the skirt's thin dimension: a correctly placed skirt has one probe clearly in
+  // FLOOD (exterior), a flipped skirt has both probes inside (WALL or interior).
+  // We probe ±cell rather than the center itself because the region grid can
+  // over-mark exterior cells within 1 cell of the wall outer face as WALL.
+  const cell = silhouette.cell_mm || 76.2;
+  for (const p of got.filter(p => p.kind === 'skirt')) {
+    const { x_mm: cx, y_mm: cy } = p.center;
+    const horiz = p.dims.dx_mm > p.dims.dy_mm;
+    const outside = horiz
+      ? (!silhouette.containsPoint(cx, cy - cell) || !silhouette.containsPoint(cx, cy + cell))
+      : (!silhouette.containsPoint(cx - cell, cy) || !silhouette.containsPoint(cx + cell, cy));
+    if (!outside) {
+      errs.push(`skirt ${p.label} center (${cx.toFixed(1)},${cy.toFixed(1)}) — both ±cell probes inside silhouette, skirt likely on wrong face`);
+    }
+  }
+
   if (got.length !== want.pieces.length) {
     errs.push(`piece count: got ${got.length}, expected ${want.pieces.length}`);
   }

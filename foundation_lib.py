@@ -293,7 +293,9 @@ def foundation_solids(params, silhouette):
     walls = silhouette.get("walls", [])
     contains_point = silhouette["contains_point"]
     cell = silhouette.get("cell_mm") or DEFAULT_CELL_MM
-    probe = cell * 0.75
+    # 2 cells: clears the ≤1-cell over-mark from any-overlap WALL marking.
+    # ¾-cell probe can land in the over-mark band and misread as interior.
+    probe = cell * 2
 
     pieces = []
 
