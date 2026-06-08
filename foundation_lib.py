@@ -184,12 +184,105 @@ def _empty_region():
 
 # ---- foundation_solids (port of web/js/foundation_geom.js) ----------------
 DEFAULT_CELL_MM = 3 * IN_TO_MM
+MERGE_TOL = 1e-6   # mm — strip x/w/edge equality
+RUN_TOL = 2        # mm — end-to-end contiguity gap along a run
+RUN_BAND = 60      # mm — same-line cross-axis clustering
+
+
+def _merge_slab_rects(rects):
+    """Greedy-merge per-row fill strips into MAXIMAL rectangles (port of
+    foundation_geom.js mergeSlabRects). Stack vertically-adjacent strips that
+    share x_mm + w_mm into one taller box → minimal rectangle set covering the
+    silhouette (rectangle house -> 1; L -> 2-3)."""
+    open_rects = []
+    for s in rects:
+        host = None
+        for o in open_rects:
+            if (abs(o["x_mm"] - s["x_mm"]) < MERGE_TOL and
+                    abs(o["w_mm"] - s["w_mm"]) < MERGE_TOL and
+                    abs((o["y_mm"] + o["h_mm"]) - s["y_mm"]) < MERGE_TOL):
+                host = o
+                break
+        if host:
+            host["h_mm"] += s["h_mm"]
+        else:
+            open_rects.append({"x_mm": s["x_mm"], "y_mm": s["y_mm"],
+                               "w_mm": s["w_mm"], "h_mm": s["h_mm"]})
+    return open_rects
+
+
+def _compute_runs(walls):
+    """Group exterior walls into runs (one run = one full side). Port of
+    foundation_geom.js computeFoundationRuns / runs.js detectRunsForLevel,
+    geometry-only. Each run: horiz, letter, near_cross, depth, a_min, a_max."""
+    feats = []
+    for w in walls:
+        bw, bh = module_bbox(w["width_mm"], w["depth_mm"], w["direction"])
+        horiz = is_horizontal(w["direction"])
+        x0, y0, x1, y1 = w["x_mm"], w["y_mm"], w["x_mm"] + bw, w["y_mm"] + bh
+        feats.append({
+            "horiz": horiz,
+            "depth": bh if horiz else bw,
+            "cross": y0 if horiz else x0,
+            "a0": x0 if horiz else y0,
+            "a1": x1 if horiz else y1,
+        })
+
+    # 1. cluster into collinear lines (same orientation + cross band)
+    lines = []
+    for ft in feats:
+        line = next((L for L in lines if L["horiz"] == ft["horiz"]
+                     and abs(L["cross"] - ft["cross"]) <= RUN_BAND), None)
+        if line is None:
+            line = {"horiz": ft["horiz"], "cross": ft["cross"], "items": []}
+            lines.append(line)
+        line["items"].append(ft)
+
+    # 2. within each line, sort along the axis and split into contiguous chains
+    runs = []
+    for L in lines:
+        L["items"].sort(key=lambda f: f["a0"])
+        chain, end = [], None
+
+        def flush():
+            nonlocal chain
+            if not chain:
+                return
+            runs.append({
+                "horiz": L["horiz"],
+                "near_cross": min(c["cross"] for c in chain),
+                "depth": chain[0]["depth"],
+                "a_min": min(c["a0"] for c in chain),
+                "a_max": max(c["a1"] for c in chain),
+            })
+            chain = []
+
+        for ft in L["items"]:
+            if chain and ft["a0"] - end > RUN_TOL:
+                flush()
+            chain.append(ft)
+            end = ft["a1"] if end is None else max(end, ft["a1"])
+        flush()
+
+    # 3. order top-to-bottom (minY), ties left-to-right (minX); letter by order
+    def min_x(r):
+        return r["a_min"] if r["horiz"] else r["near_cross"]
+
+    def min_y(r):
+        return r["near_cross"] if r["horiz"] else r["a_min"]
+
+    runs.sort(key=lambda r: (min_y(r), min_x(r)))
+    for i, r in enumerate(runs):
+        r["letter"] = chr(65 + i)
+    return runs
 
 
 def foundation_solids(params, silhouette):
     """Port of foundation_geom.js foundationSolids. Returns ordered list of
     piece dicts {group, kind, label, dims{dx_mm,dy_mm,dz_mm},
-    center{x_mm,y_mm,z_mm}}. World plan mm, z-DOWN (top of slab = z=0)."""
+    center{x_mm,y_mm,z_mm}}. World plan mm, z-DOWN (top of slab = z=0).
+    Monolithic slab + one grade beam per run + one continuous frost skirt
+    per run (corner-extended so the FPSF loop is gapless)."""
     slab_t = params["slab_thickness_mm"]
     beam_w = params["beam_w_mm"]
     beam_d = params["beam_d_mm"]
@@ -204,8 +297,8 @@ def foundation_solids(params, silhouette):
 
     pieces = []
 
-    # SLAB — one box per L1 silhouette rect, extruded down from z=0.
-    for i, r in enumerate(rects):
+    # SLAB — monolithic: maximal rectangles covering the silhouette.
+    for i, r in enumerate(_merge_slab_rects(rects)):
         pieces.append({
             "group": "foundation", "kind": "slab", "label": "slab_%02d" % i,
             "dims": {"dx_mm": r["w_mm"], "dy_mm": r["h_mm"], "dz_mm": slab_t},
@@ -213,39 +306,45 @@ def foundation_solids(params, silhouette):
                        "y_mm": r["y_mm"] + r["h_mm"] / 2, "z_mm": -slab_t / 2},
         })
 
-    # GRADE BEAM + FROST SKIRT — one of each per L1 exterior wall.
-    for w in walls:
-        bw, bh = module_bbox(w["width_mm"], w["depth_mm"], w["direction"])
-        horiz = bw >= bh
-        length = bw if horiz else bh
-        cx = w["x_mm"] + bw / 2
-        cy = w["y_mm"] + bh / 2
+    runs = _compute_runs(walls)
 
+    # GRADE BEAM — one per run, full length, centered on the wall line.
+    for r in runs:
+        length = r["a_max"] - r["a_min"]
+        axis_c = (r["a_min"] + r["a_max"]) / 2
+        line_c = r["near_cross"] + r["depth"] / 2
         pieces.append({
-            "group": "foundation", "kind": "beam", "label": "beam_%s" % w["id"],
-            "dims": {"dx_mm": length if horiz else beam_w,
-                     "dy_mm": beam_w if horiz else length, "dz_mm": beam_d},
-            "center": {"x_mm": cx, "y_mm": cy, "z_mm": -beam_d / 2},
+            "group": "foundation", "kind": "beam", "label": "beam_%s" % r["letter"],
+            "dims": {"dx_mm": length if r["horiz"] else beam_w,
+                     "dy_mm": beam_w if r["horiz"] else length, "dz_mm": beam_d},
+            "center": ({"x_mm": axis_c, "y_mm": line_c, "z_mm": -beam_d / 2}
+                       if r["horiz"]
+                       else {"x_mm": line_c, "y_mm": axis_c, "z_mm": -beam_d / 2}),
         })
 
-        # Corner-closing rule: grow each skirt panel by skirt_thickness past both
-        # ends of its wall run (see foundation_geom.js for the full rationale).
-        grown = length + 2 * skirt_t
-        if horiz:
-            top_out = not contains_point(cx, w["y_mm"] - probe)
-            fy = (w["y_mm"] - skirt_t / 2) if top_out else (w["y_mm"] + bh + skirt_t / 2)
+    # FROST SKIRT — one continuous panel per run on its OUTSIDE face, corner-
+    # extended by a full wall depth past each end so adjacent skirts overlap
+    # with NO gap (see foundation_geom.js for the full corner-extension rule).
+    for r in runs:
+        length = r["a_max"] - r["a_min"]
+        axis_c = (r["a_min"] + r["a_max"]) / 2
+        grown = length + 2 * r["depth"]
+        far_cross = r["near_cross"] + r["depth"]
+        if r["horiz"]:
+            near_out = not contains_point(axis_c, r["near_cross"] - probe)
+            fy = (r["near_cross"] - skirt_t / 2) if near_out else (far_cross + skirt_t / 2)
             pieces.append({
-                "group": "foundation", "kind": "skirt", "label": "skirt_%s" % w["id"],
+                "group": "foundation", "kind": "skirt", "label": "skirt_%s" % r["letter"],
                 "dims": {"dx_mm": grown, "dy_mm": skirt_t, "dz_mm": skirt_d},
-                "center": {"x_mm": cx, "y_mm": fy, "z_mm": -skirt_d / 2},
+                "center": {"x_mm": axis_c, "y_mm": fy, "z_mm": -skirt_d / 2},
             })
         else:
-            left_out = not contains_point(w["x_mm"] - probe, cy)
-            fx = (w["x_mm"] - skirt_t / 2) if left_out else (w["x_mm"] + bw + skirt_t / 2)
+            near_out = not contains_point(r["near_cross"] - probe, axis_c)
+            fx = (r["near_cross"] - skirt_t / 2) if near_out else (far_cross + skirt_t / 2)
             pieces.append({
-                "group": "foundation", "kind": "skirt", "label": "skirt_%s" % w["id"],
+                "group": "foundation", "kind": "skirt", "label": "skirt_%s" % r["letter"],
                 "dims": {"dx_mm": skirt_t, "dy_mm": grown, "dz_mm": skirt_d},
-                "center": {"x_mm": fx, "y_mm": cy, "z_mm": -skirt_d / 2},
+                "center": {"x_mm": fx, "y_mm": axis_c, "z_mm": -skirt_d / 2},
             })
 
     return pieces

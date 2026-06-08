@@ -11,23 +11,125 @@
 //   params     = { slab_thickness_mm, beam_w_mm, beam_d_mm,
 //                  skirt_depth_mm, skirt_thickness_mm }
 //   silhouette = { rects, walls, containsPoint, cell_mm? }
-//     rects   — the L1 filled-silhouette rectangles (region.rects); the slab.
-//     walls   — L1 kind:'wall' entities { id, x_mm, y_mm, mod, dir }; the beam
-//               + skirt trace each one. mod carries width_mm/depth_mm.
-//     containsPoint(x,y) — region probe used to find each wall's OUTSIDE face.
+//     rects   — the L1 filled-silhouette per-ROW strips (region.rects). Greedy-
+//               merged here into MAXIMAL rectangles → the monolithic slab.
+//     walls   — L1 kind:'wall' entities { id, x_mm, y_mm, mod, dir }. Grouped
+//               into RUNS (a run = one full exterior side); each run gets ONE
+//               grade beam + ONE continuous frost skirt.
+//     containsPoint(x,y) — region probe used to find each run's OUTSIDE face.
 //
 //   piece = { group:'foundation', kind:'slab'|'beam'|'skirt', label,
 //             dims:{dx_mm,dy_mm,dz_mm}, center:{x_mm,y_mm,z_mm} }
+//
+// Pieces:
+//   slab_NN   — monolithic poured slab. The silhouette covered by the minimal
+//               set of maximal rectangles (rectangle house → 1; L → 2–3). NOT a
+//               bbox, NOT per-row strips.
+//   beam_<L>  — one grade beam per run <L> (run letter), spanning the run's full
+//               length, beam_w across, beam_d deep, top at z=0.
+//   skirt_<L> — one continuous frost skirt per run on its OUTSIDE face,
+//               corner-extended so the FPSF loop is gapless (see SKIRT below).
 //
 // World plan mm; z-DOWN convention: the top of the slab is the ground datum
 // z=0, so every piece extrudes downward and its center z is negative (matches
 // render3d's scene). Consumers apply their own origin offset / Y-mirror.
 // =====================================================
-import { getModuleBBox } from './geometry.js';
+import { getModuleBBox, isHorizontal } from './geometry.js';
 
 // 3" region cell, kept in sync with region.js REGION_CELL_MM. Only used as a
 // fallback for the outside-face probe distance if the caller omits cell_mm.
 const DEFAULT_CELL_MM = 3 * 25.4;
+
+const MERGE_TOL = 1e-6; // mm — strip x/w/edge equality (both sides exact arithmetic)
+const RUN_TOL = 2;      // mm — end-to-end contiguity gap along a run
+const RUN_BAND = 60;    // mm — same-line cross-axis clustering (mirrors runs.js)
+
+// SLAB — greedy-merge the per-row fill strips into MAXIMAL rectangles.
+// region.rects are 1-cell-tall (~3") strips, sorted row-by-row (ascending y),
+// within a row ascending x. Merge a strip into an open rect when they share
+// x_mm + w_mm and the open rect's bottom edge meets the strip's top edge — i.e.
+// stack vertically-adjacent equal-width strips into one taller box. A gap (or a
+// width change) starts a fresh rect. Result: the minimal rectangle set covering
+// the silhouette. Rectangle house → 1 box; L → 2–3.
+function mergeSlabRects(rects) {
+  const open = [];
+  for (const s of rects) {
+    let host = null;
+    for (const o of open) {
+      if (Math.abs(o.x_mm - s.x_mm) < MERGE_TOL &&
+          Math.abs(o.w_mm - s.w_mm) < MERGE_TOL &&
+          Math.abs((o.y_mm + o.h_mm) - s.y_mm) < MERGE_TOL) { host = o; break; }
+    }
+    if (host) host.h_mm += s.h_mm;
+    else open.push({ x_mm: s.x_mm, y_mm: s.y_mm, w_mm: s.w_mm, h_mm: s.h_mm });
+  }
+  return open;
+}
+
+// RUNS — group the exterior walls into runs (one run = one full side), the same
+// way runs.js detectRunsForLevel does but geometry-only (no design registry):
+// cluster collinear walls (same orientation + cross band), split each cluster
+// into end-to-end contiguous chains, then order top-to-bottom (near cross),
+// ties left-to-right, and letter A,B,C… by that order. Foundation is single-
+// level (L1), so the letters match computeRuns' L1 letters.
+//
+// Each run carries: horiz, letter, nearCross (the wall line's near edge), depth
+// (perpendicular footprint dim), aMin/aMax (along-axis extent of the chain).
+function computeFoundationRuns(walls) {
+  const feats = walls.map(w => {
+    const bb = getModuleBBox(w.mod, w.dir);
+    const horiz = isHorizontal(w.dir);
+    const x0 = w.x_mm, y0 = w.y_mm, x1 = x0 + bb.w, y1 = y0 + bb.h;
+    return {
+      horiz,
+      depth: horiz ? bb.h : bb.w,          // perpendicular footprint dim
+      cross: horiz ? y0 : x0,              // near edge of the wall line
+      a0: horiz ? x0 : y0,                 // start along the run axis
+      a1: horiz ? x1 : y1,                 // end along the run axis
+    };
+  });
+
+  // 1. cluster into collinear lines (same orientation + cross band)
+  const lines = [];
+  for (const ft of feats) {
+    let line = lines.find(L => L.horiz === ft.horiz && Math.abs(L.cross - ft.cross) <= RUN_BAND);
+    if (!line) { line = { horiz: ft.horiz, cross: ft.cross, items: [] }; lines.push(line); }
+    line.items.push(ft);
+  }
+
+  // 2. within each line, sort along the axis and split into contiguous chains
+  const runs = [];
+  for (const L of lines) {
+    L.items.sort((a, b) => a.a0 - b.a0);
+    let chain = [], end = null;
+    const flush = () => {
+      if (!chain.length) return;
+      runs.push({
+        horiz: L.horiz,
+        nearCross: Math.min(...chain.map(c => c.cross)),
+        depth: chain[0].depth,
+        aMin: Math.min(...chain.map(c => c.a0)),
+        aMax: Math.max(...chain.map(c => c.a1)),
+      });
+      chain = [];
+    };
+    for (const ft of L.items) {
+      if (chain.length && ft.a0 - end > RUN_TOL) flush();
+      chain.push(ft);
+      end = end === null ? ft.a1 : Math.max(end, ft.a1);
+    }
+    flush();
+  }
+
+  // 3. deterministic order: top-to-bottom (footprint minY), ties left-to-right
+  //    (minX) — same key as runs.js — then letter A,B,C… by that order (matches
+  //    computeRuns for L1). minX/minY = the chain's footprint corner.
+  const minX = r => (r.horiz ? r.aMin : r.nearCross);
+  const minY = r => (r.horiz ? r.nearCross : r.aMin);
+  runs.sort((a, b) => minY(a) - minY(b) || minX(a) - minX(b));
+  runs.forEach((r, i) => { r.letter = String.fromCharCode(65 + i); });
+  return runs;
+}
 
 export function foundationSolids(params, silhouette) {
   const slabT  = params.slab_thickness_mm;
@@ -44,8 +146,8 @@ export function foundationSolids(params, silhouette) {
 
   const pieces = [];
 
-  // SLAB — one box per L1 silhouette rect, extruded down from z=0.
-  rects.forEach((r, i) => {
+  // SLAB — monolithic: maximal rectangles covering the silhouette.
+  mergeSlabRects(rects).forEach((r, i) => {
     pieces.push({
       group: 'foundation', kind: 'slab',
       label: `slab_${String(i).padStart(2, '0')}`,
@@ -54,51 +156,54 @@ export function foundationSolids(params, silhouette) {
     });
   });
 
-  // GRADE BEAM + FROST SKIRT — one of each per L1 exterior wall.
-  for (const w of walls) {
-    const bb = getModuleBBox(w.mod, w.dir);
-    const horiz = bb.w >= bb.h;        // wall runs along X
-    const len = horiz ? bb.w : bb.h;
-    const cx = w.x_mm + bb.w / 2;      // footprint center (world plan mm)
-    const cy = w.y_mm + bb.h / 2;
+  const runs = computeFoundationRuns(walls);
 
-    // GRADE BEAM — along the run, beam_w across, beam_d deep, top at z=0.
+  // GRADE BEAM — one per run, spanning the run's full length, centered on the
+  // wall line, beam_w across, beam_d deep, top at z=0.
+  for (const r of runs) {
+    const len = r.aMax - r.aMin;
+    const axisC = (r.aMin + r.aMax) / 2;
+    const lineC = r.nearCross + r.depth / 2; // wall centerline (cross axis)
     pieces.push({
-      group: 'foundation', kind: 'beam', label: `beam_${w.id}`,
-      dims: { dx_mm: horiz ? len : beamW, dy_mm: horiz ? beamW : len, dz_mm: beamD },
-      center: { x_mm: cx, y_mm: cy, z_mm: -beamD / 2 },
+      group: 'foundation', kind: 'beam', label: `beam_${r.letter}`,
+      dims: { dx_mm: r.horiz ? len : beamW, dy_mm: r.horiz ? beamW : len, dz_mm: beamD },
+      center: r.horiz ? { x_mm: axisC, y_mm: lineC, z_mm: -beamD / 2 }
+                      : { x_mm: lineC, y_mm: axisC, z_mm: -beamD / 2 },
     });
+  }
 
-    // FROST SKIRT — thin EPS panel on the wall's OUTSIDE face (the side whose
-    // just-past-the-face probe is NOT inside the silhouette).
-    //
-    // CORNER-CLOSING RULE: each skirt panel is grown by skirt_thickness past
-    // BOTH ends of its wall run (length += 2*skirt_thickness, center unchanged).
-    // At an exterior corner two perpendicular runs meet; the neighbour's skirt
-    // sits skirt_thickness outside the perpendicular wall, so extending by
-    // exactly that distance makes this panel reach across the corner square and
-    // overlap the neighbour — leaving NO gap (FPSF stays continuous). Exterior
-    // walls form a closed loop, so every skirt end is either a corner (the
-    // extension fills it) or a collinear butt joint (the panels simply overlap,
-    // a harmless union) — never a free end that would stick out into nothing.
-    const grown = len + 2 * skirtT;
-    if (horiz) {
-      const topOut = !containsPoint(cx, w.y_mm - probe);
-      const fy = topOut ? w.y_mm - skirtT / 2
-                        : w.y_mm + bb.h + skirtT / 2;
+  // FROST SKIRT — one CONTINUOUS panel per run on its OUTSIDE face (the side
+  // whose just-past-the-face probe is NOT inside the silhouette), skirt_thickness
+  // thick, skirt_depth deep, top at z=0.
+  //
+  // CORNER-EXTENSION RULE (this is what makes the FPSF loop gapless): grow each
+  // panel past BOTH ends of its run by the perpendicular run's wall depth
+  // (≈ wall depth, uniform here). At an exterior corner the perpendicular run's
+  // skirt sits skirt_thickness outside its wall, ending ~flush with this run's
+  // wall line; extending THIS panel by a full wall depth makes it sweep across
+  // and fully cover the corner square — so adjacent skirts overlap with NO gap.
+  // Runs tile the perimeter face-by-face, so every panel end is a corner (the
+  // extension fills it) — never a free end stranded in open air.
+  for (const r of runs) {
+    const len = r.aMax - r.aMin;
+    const axisC = (r.aMin + r.aMax) / 2;
+    const grown = len + 2 * r.depth;
+    const farCross = r.nearCross + r.depth;
+    if (r.horiz) {
+      const nearOut = !containsPoint(axisC, r.nearCross - probe);
+      const fy = nearOut ? r.nearCross - skirtT / 2 : farCross + skirtT / 2;
       pieces.push({
-        group: 'foundation', kind: 'skirt', label: `skirt_${w.id}`,
+        group: 'foundation', kind: 'skirt', label: `skirt_${r.letter}`,
         dims: { dx_mm: grown, dy_mm: skirtT, dz_mm: skirtD },
-        center: { x_mm: cx, y_mm: fy, z_mm: -skirtD / 2 },
+        center: { x_mm: axisC, y_mm: fy, z_mm: -skirtD / 2 },
       });
     } else {
-      const leftOut = !containsPoint(w.x_mm - probe, cy);
-      const fx = leftOut ? w.x_mm - skirtT / 2
-                         : w.x_mm + bb.w + skirtT / 2;
+      const nearOut = !containsPoint(r.nearCross - probe, axisC);
+      const fx = nearOut ? r.nearCross - skirtT / 2 : farCross + skirtT / 2;
       pieces.push({
-        group: 'foundation', kind: 'skirt', label: `skirt_${w.id}`,
+        group: 'foundation', kind: 'skirt', label: `skirt_${r.letter}`,
         dims: { dx_mm: skirtT, dy_mm: grown, dz_mm: skirtD },
-        center: { x_mm: fx, y_mm: cy, z_mm: -skirtD / 2 },
+        center: { x_mm: fx, y_mm: axisC, z_mm: -skirtD / 2 },
       });
     }
   }

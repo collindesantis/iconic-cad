@@ -328,7 +328,7 @@ export async function exportFcstd(filename = 'house.FCStd') {
   // level-aware trade emits one folder per level (Framing_Level_1, …); a
   // level-agnostic trade emits one folder (Foundation). Adding a future trade =
   // add a registry entry; no other exporter edits.
-  let wallN = 0, blkN = 0, fndN = 0;
+  let wallN = 0, blkN = 0;
 
   // FRAMING — wraps the EXISTING wall/blocking BREP emission, per level.
   function framingObjs(level) {
@@ -372,10 +372,9 @@ export async function exportFcstd(filename = 'house.FCStd') {
       const fx = pc.center.x_mm - minx;          // same world->FreeCAD transform
       const fy = -(pc.center.y_mm - miny);       // as the walls; boxes are symmetric
       const fz = pc.center.z_mm;
-      out.push({ name: `Fnd${fndN}`, label: `foundation_${pc.label}`,
+      out.push({ name: `foundation_${pc.label}`, label: `foundation_${pc.label}`,
                  brep: boxBrep(dx, dy, dz, fx - dx / 2, fy - dy / 2, fz - dz / 2),
                  color: pc.kind === 'skirt' ? COL_EPS : COL_CONCRETE });
-      fndN++;
       // grow the camera frame to include this below-grade box
       bounds.minX = Math.min(bounds.minX, fx - dx / 2); bounds.maxX = Math.max(bounds.maxX, fx + dx / 2);
       bounds.minY = Math.min(bounds.minY, fy - dy / 2); bounds.maxY = Math.max(bounds.maxY, fy + dy / 2);

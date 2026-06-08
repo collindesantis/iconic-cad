@@ -14,606 +14,21 @@
         "label": "slab_00",
         "dims": {
           "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
+          "dy_mm": 2743.199999999999,
           "dz_mm": 101.6
         },
         "center": {
           "x_mm": 1828.7999999999997,
-          "y_mm": 38.099999999999994,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_01",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 114.29999999999998,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_02",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 190.49999999999997,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_03",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 266.69999999999993,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_04",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 342.9,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_05",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 419.0999999999999,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_06",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 495.29999999999995,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_07",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 571.5,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_08",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 647.6999999999999,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_09",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 723.8999999999999,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_10",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 800.0999999999999,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_11",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 876.3,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_12",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 952.4999999999998,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_13",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 1028.6999999999998,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_14",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 1104.8999999999996,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_15",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 1181.1,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_16",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 1257.2999999999997,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_17",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 1333.4999999999995,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_18",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 1409.6999999999998,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_19",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 1485.8999999999996,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_20",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 1562.0999999999995,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_21",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 1638.2999999999997,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_22",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 1714.4999999999995,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_23",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 1790.6999999999998,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_24",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 1866.8999999999996,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_25",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 1943.0999999999995,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_26",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 2019.2999999999993,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_27",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 2095.4999999999995,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_28",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 2171.6999999999994,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_29",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 2247.8999999999996,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_30",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 2324.0999999999995,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_31",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 2400.2999999999993,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_32",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 2476.4999999999995,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_33",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 2552.6999999999994,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_34",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 2628.8999999999996,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_35",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 2705.0999999999995,
+          "y_mm": 1371.5999999999995,
           "z_mm": -50.8
         }
       },
       {
         "group": "foundation",
         "kind": "beam",
-        "label": "beam_rs0",
+        "label": "beam_A",
         "dims": {
-          "dx_mm": 1219.2,
-          "dy_mm": 304.8,
-          "dz_mm": 457.2
-        },
-        "center": {
-          "x_mm": 609.6,
-          "y_mm": 75.40625,
-          "z_mm": -228.6
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "skirt",
-        "label": "skirt_rs0",
-        "dims": {
-          "dx_mm": 1320.8,
-          "dy_mm": 50.8,
-          "dz_mm": 750.0
-        },
-        "center": {
-          "x_mm": 609.6,
-          "y_mm": -25.4,
-          "z_mm": -375.0
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "beam",
-        "label": "beam_rn0",
-        "dims": {
-          "dx_mm": 1219.2,
-          "dy_mm": 304.8,
-          "dz_mm": 457.2
-        },
-        "center": {
-          "x_mm": 609.6,
-          "y_mm": 2664.61875,
-          "z_mm": -228.6
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "skirt",
-        "label": "skirt_rn0",
-        "dims": {
-          "dx_mm": 1320.8,
-          "dy_mm": 50.8,
-          "dz_mm": 750.0
-        },
-        "center": {
-          "x_mm": 609.6,
-          "y_mm": 2765.425,
-          "z_mm": -375.0
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "beam",
-        "label": "beam_rs1",
-        "dims": {
-          "dx_mm": 1219.2,
+          "dx_mm": 3657.6000000000004,
           "dy_mm": 304.8,
           "dz_mm": 457.2
         },
@@ -625,226 +40,106 @@
       },
       {
         "group": "foundation",
-        "kind": "skirt",
-        "label": "skirt_rs1",
-        "dims": {
-          "dx_mm": 1320.8,
-          "dy_mm": 50.8,
-          "dz_mm": 750.0
-        },
-        "center": {
-          "x_mm": 1828.8000000000002,
-          "y_mm": -25.4,
-          "z_mm": -375.0
-        }
-      },
-      {
-        "group": "foundation",
         "kind": "beam",
-        "label": "beam_rn1",
-        "dims": {
-          "dx_mm": 1219.2,
-          "dy_mm": 304.8,
-          "dz_mm": 457.2
-        },
-        "center": {
-          "x_mm": 1828.8000000000002,
-          "y_mm": 2664.61875,
-          "z_mm": -228.6
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "skirt",
-        "label": "skirt_rn1",
-        "dims": {
-          "dx_mm": 1320.8,
-          "dy_mm": 50.8,
-          "dz_mm": 750.0
-        },
-        "center": {
-          "x_mm": 1828.8000000000002,
-          "y_mm": 2765.425,
-          "z_mm": -375.0
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "beam",
-        "label": "beam_rs2",
-        "dims": {
-          "dx_mm": 1219.2,
-          "dy_mm": 304.8,
-          "dz_mm": 457.2
-        },
-        "center": {
-          "x_mm": 3048.0,
-          "y_mm": 75.40625,
-          "z_mm": -228.6
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "skirt",
-        "label": "skirt_rs2",
-        "dims": {
-          "dx_mm": 1320.8,
-          "dy_mm": 50.8,
-          "dz_mm": 750.0
-        },
-        "center": {
-          "x_mm": 3048.0,
-          "y_mm": -25.4,
-          "z_mm": -375.0
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "beam",
-        "label": "beam_rn2",
-        "dims": {
-          "dx_mm": 1219.2,
-          "dy_mm": 304.8,
-          "dz_mm": 457.2
-        },
-        "center": {
-          "x_mm": 3048.0,
-          "y_mm": 2664.61875,
-          "z_mm": -228.6
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "skirt",
-        "label": "skirt_rn2",
-        "dims": {
-          "dx_mm": 1320.8,
-          "dy_mm": 50.8,
-          "dz_mm": 750.0
-        },
-        "center": {
-          "x_mm": 3048.0,
-          "y_mm": 2765.425,
-          "z_mm": -375.0
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "beam",
-        "label": "beam_rw0",
+        "label": "beam_B",
         "dims": {
           "dx_mm": 304.8,
-          "dy_mm": 1219.2,
+          "dy_mm": 2438.4,
           "dz_mm": 457.2
         },
         "center": {
           "x_mm": 75.40625,
-          "y_mm": 760.4125,
+          "y_mm": 1370.0125,
           "z_mm": -228.6
         }
       },
       {
         "group": "foundation",
-        "kind": "skirt",
-        "label": "skirt_rw0",
-        "dims": {
-          "dx_mm": 50.8,
-          "dy_mm": 1320.8,
-          "dz_mm": 750.0
-        },
-        "center": {
-          "x_mm": -25.4,
-          "y_mm": 760.4125,
-          "z_mm": -375.0
-        }
-      },
-      {
-        "group": "foundation",
         "kind": "beam",
-        "label": "beam_re0",
+        "label": "beam_C",
         "dims": {
           "dx_mm": 304.8,
-          "dy_mm": 1219.2,
+          "dy_mm": 2438.4,
           "dz_mm": 457.2
         },
         "center": {
           "x_mm": 3582.1937500000004,
-          "y_mm": 760.4125,
+          "y_mm": 1370.0125,
           "z_mm": -228.6
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "skirt",
-        "label": "skirt_re0",
-        "dims": {
-          "dx_mm": 50.8,
-          "dy_mm": 1320.8,
-          "dz_mm": 750.0
-        },
-        "center": {
-          "x_mm": 3683.0000000000005,
-          "y_mm": 760.4125,
-          "z_mm": -375.0
         }
       },
       {
         "group": "foundation",
         "kind": "beam",
-        "label": "beam_rw1",
+        "label": "beam_D",
         "dims": {
-          "dx_mm": 304.8,
-          "dy_mm": 1219.2,
+          "dx_mm": 3657.6000000000004,
+          "dy_mm": 304.8,
           "dz_mm": 457.2
         },
         "center": {
-          "x_mm": 75.40625,
-          "y_mm": 1979.6125000000002,
+          "x_mm": 1828.8000000000002,
+          "y_mm": 2664.61875,
           "z_mm": -228.6
         }
       },
       {
         "group": "foundation",
         "kind": "skirt",
-        "label": "skirt_rw1",
+        "label": "skirt_A",
+        "dims": {
+          "dx_mm": 3959.2250000000004,
+          "dy_mm": 50.8,
+          "dz_mm": 750.0
+        },
+        "center": {
+          "x_mm": 1828.8000000000002,
+          "y_mm": -25.4,
+          "z_mm": -375.0
+        }
+      },
+      {
+        "group": "foundation",
+        "kind": "skirt",
+        "label": "skirt_B",
         "dims": {
           "dx_mm": 50.8,
-          "dy_mm": 1320.8,
+          "dy_mm": 2740.025,
           "dz_mm": 750.0
         },
         "center": {
           "x_mm": -25.4,
-          "y_mm": 1979.6125000000002,
+          "y_mm": 1370.0125,
           "z_mm": -375.0
         }
       },
       {
         "group": "foundation",
-        "kind": "beam",
-        "label": "beam_re1",
+        "kind": "skirt",
+        "label": "skirt_C",
         "dims": {
-          "dx_mm": 304.8,
-          "dy_mm": 1219.2,
-          "dz_mm": 457.2
+          "dx_mm": 50.8,
+          "dy_mm": 2740.025,
+          "dz_mm": 750.0
         },
         "center": {
-          "x_mm": 3582.1937500000004,
-          "y_mm": 1979.6125000000002,
-          "z_mm": -228.6
+          "x_mm": 3683.0000000000005,
+          "y_mm": 1370.0125,
+          "z_mm": -375.0
         }
       },
       {
         "group": "foundation",
         "kind": "skirt",
-        "label": "skirt_re1",
+        "label": "skirt_D",
         "dims": {
-          "dx_mm": 50.8,
-          "dy_mm": 1320.8,
+          "dx_mm": 3959.2250000000004,
+          "dy_mm": 50.8,
           "dz_mm": 750.0
         },
         "center": {
-          "x_mm": 3683.0000000000005,
-          "y_mm": 1979.6125000000002,
+          "x_mm": 1828.8000000000002,
+          "y_mm": 2765.425,
           "z_mm": -375.0
         }
       }
@@ -865,12 +160,12 @@
         "label": "slab_00",
         "dims": {
           "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
+          "dy_mm": 1524.0000000000005,
           "dz_mm": 101.6
         },
         "center": {
           "x_mm": 1828.7999999999997,
-          "y_mm": 38.099999999999994,
+          "y_mm": 762.0000000000002,
           "z_mm": -50.8
         }
       },
@@ -879,562 +174,22 @@
         "kind": "slab",
         "label": "slab_01",
         "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 114.29999999999998,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_02",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 190.49999999999997,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_03",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 266.69999999999993,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_04",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 342.9,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_05",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 419.0999999999999,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_06",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 495.29999999999995,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_07",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 571.5,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_08",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 647.6999999999999,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_09",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 723.8999999999999,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_10",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 800.0999999999999,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_11",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 876.3,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_12",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 952.4999999999998,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_13",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 1028.6999999999998,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_14",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 1104.8999999999996,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_15",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 1181.1,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_16",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 1257.2999999999997,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_17",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 1333.4999999999995,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_18",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 1409.6999999999998,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_19",
-        "dims": {
-          "dx_mm": 3657.5999999999995,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1828.7999999999997,
-          "y_mm": 1485.8999999999996,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_20",
-        "dims": {
           "dx_mm": 2438.3999999999996,
-          "dy_mm": 76.19999999999999,
+          "dy_mm": 1219.2000000000003,
           "dz_mm": 101.6
         },
         "center": {
           "x_mm": 1219.1999999999998,
-          "y_mm": 1562.0999999999995,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_21",
-        "dims": {
-          "dx_mm": 2438.3999999999996,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1219.1999999999998,
-          "y_mm": 1638.2999999999997,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_22",
-        "dims": {
-          "dx_mm": 2438.3999999999996,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1219.1999999999998,
-          "y_mm": 1714.4999999999995,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_23",
-        "dims": {
-          "dx_mm": 2438.3999999999996,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1219.1999999999998,
-          "y_mm": 1790.6999999999998,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_24",
-        "dims": {
-          "dx_mm": 2438.3999999999996,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1219.1999999999998,
-          "y_mm": 1866.8999999999996,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_25",
-        "dims": {
-          "dx_mm": 2438.3999999999996,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1219.1999999999998,
-          "y_mm": 1943.0999999999995,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_26",
-        "dims": {
-          "dx_mm": 2438.3999999999996,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1219.1999999999998,
-          "y_mm": 2019.2999999999993,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_27",
-        "dims": {
-          "dx_mm": 2438.3999999999996,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1219.1999999999998,
-          "y_mm": 2095.4999999999995,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_28",
-        "dims": {
-          "dx_mm": 2438.3999999999996,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1219.1999999999998,
-          "y_mm": 2171.6999999999994,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_29",
-        "dims": {
-          "dx_mm": 2438.3999999999996,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1219.1999999999998,
-          "y_mm": 2247.8999999999996,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_30",
-        "dims": {
-          "dx_mm": 2438.3999999999996,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1219.1999999999998,
-          "y_mm": 2324.0999999999995,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_31",
-        "dims": {
-          "dx_mm": 2438.3999999999996,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1219.1999999999998,
-          "y_mm": 2400.2999999999993,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_32",
-        "dims": {
-          "dx_mm": 2438.3999999999996,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1219.1999999999998,
-          "y_mm": 2476.4999999999995,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_33",
-        "dims": {
-          "dx_mm": 2438.3999999999996,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1219.1999999999998,
-          "y_mm": 2552.6999999999994,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_34",
-        "dims": {
-          "dx_mm": 2438.3999999999996,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1219.1999999999998,
-          "y_mm": 2628.8999999999996,
-          "z_mm": -50.8
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "slab",
-        "label": "slab_35",
-        "dims": {
-          "dx_mm": 2438.3999999999996,
-          "dy_mm": 76.19999999999999,
-          "dz_mm": 101.6
-        },
-        "center": {
-          "x_mm": 1219.1999999999998,
-          "y_mm": 2705.0999999999995,
+          "y_mm": 2133.5999999999995,
           "z_mm": -50.8
         }
       },
       {
         "group": "foundation",
         "kind": "beam",
-        "label": "beam_ls0",
+        "label": "beam_A",
         "dims": {
-          "dx_mm": 1219.2,
-          "dy_mm": 304.8,
-          "dz_mm": 457.2
-        },
-        "center": {
-          "x_mm": 609.6,
-          "y_mm": 75.40625,
-          "z_mm": -228.6
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "skirt",
-        "label": "skirt_ls0",
-        "dims": {
-          "dx_mm": 1320.8,
-          "dy_mm": 50.8,
-          "dz_mm": 750.0
-        },
-        "center": {
-          "x_mm": 609.6,
-          "y_mm": -25.4,
-          "z_mm": -375.0
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "beam",
-        "label": "beam_ls1",
-        "dims": {
-          "dx_mm": 1219.2,
+          "dx_mm": 3657.6000000000004,
           "dy_mm": 304.8,
           "dz_mm": 457.2
         },
@@ -1446,203 +201,23 @@
       },
       {
         "group": "foundation",
-        "kind": "skirt",
-        "label": "skirt_ls1",
-        "dims": {
-          "dx_mm": 1320.8,
-          "dy_mm": 50.8,
-          "dz_mm": 750.0
-        },
-        "center": {
-          "x_mm": 1828.8000000000002,
-          "y_mm": -25.4,
-          "z_mm": -375.0
-        }
-      },
-      {
-        "group": "foundation",
         "kind": "beam",
-        "label": "beam_ls2",
-        "dims": {
-          "dx_mm": 1219.2,
-          "dy_mm": 304.8,
-          "dz_mm": 457.2
-        },
-        "center": {
-          "x_mm": 3048.0,
-          "y_mm": 75.40625,
-          "z_mm": -228.6
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "skirt",
-        "label": "skirt_ls2",
-        "dims": {
-          "dx_mm": 1320.8,
-          "dy_mm": 50.8,
-          "dz_mm": 750.0
-        },
-        "center": {
-          "x_mm": 3048.0,
-          "y_mm": -25.4,
-          "z_mm": -375.0
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "beam",
-        "label": "beam_lnL0",
-        "dims": {
-          "dx_mm": 1219.2,
-          "dy_mm": 304.8,
-          "dz_mm": 457.2
-        },
-        "center": {
-          "x_mm": 609.6,
-          "y_mm": 2664.61875,
-          "z_mm": -228.6
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "skirt",
-        "label": "skirt_lnL0",
-        "dims": {
-          "dx_mm": 1320.8,
-          "dy_mm": 50.8,
-          "dz_mm": 750.0
-        },
-        "center": {
-          "x_mm": 609.6,
-          "y_mm": 2765.425,
-          "z_mm": -375.0
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "beam",
-        "label": "beam_lnL1",
-        "dims": {
-          "dx_mm": 1219.2,
-          "dy_mm": 304.8,
-          "dz_mm": 457.2
-        },
-        "center": {
-          "x_mm": 1828.8000000000002,
-          "y_mm": 2664.61875,
-          "z_mm": -228.6
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "skirt",
-        "label": "skirt_lnL1",
-        "dims": {
-          "dx_mm": 1320.8,
-          "dy_mm": 50.8,
-          "dz_mm": 750.0
-        },
-        "center": {
-          "x_mm": 1828.8000000000002,
-          "y_mm": 2765.425,
-          "z_mm": -375.0
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "beam",
-        "label": "beam_lnR0",
-        "dims": {
-          "dx_mm": 1219.2,
-          "dy_mm": 304.8,
-          "dz_mm": 457.2
-        },
-        "center": {
-          "x_mm": 3048.0,
-          "y_mm": 1445.41875,
-          "z_mm": -228.6
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "skirt",
-        "label": "skirt_lnR0",
-        "dims": {
-          "dx_mm": 1320.8,
-          "dy_mm": 50.8,
-          "dz_mm": 750.0
-        },
-        "center": {
-          "x_mm": 3048.0,
-          "y_mm": 1546.2250000000001,
-          "z_mm": -375.0
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "beam",
-        "label": "beam_lw0",
+        "label": "beam_B",
         "dims": {
           "dx_mm": 304.8,
-          "dy_mm": 1219.2,
+          "dy_mm": 2438.4,
           "dz_mm": 457.2
         },
         "center": {
           "x_mm": 75.40625,
-          "y_mm": 760.4125,
+          "y_mm": 1370.0125,
           "z_mm": -228.6
         }
       },
       {
         "group": "foundation",
-        "kind": "skirt",
-        "label": "skirt_lw0",
-        "dims": {
-          "dx_mm": 50.8,
-          "dy_mm": 1320.8,
-          "dz_mm": 750.0
-        },
-        "center": {
-          "x_mm": -25.4,
-          "y_mm": 760.4125,
-          "z_mm": -375.0
-        }
-      },
-      {
-        "group": "foundation",
         "kind": "beam",
-        "label": "beam_lw1",
-        "dims": {
-          "dx_mm": 304.8,
-          "dy_mm": 1219.2,
-          "dz_mm": 457.2
-        },
-        "center": {
-          "x_mm": 75.40625,
-          "y_mm": 1979.6125000000002,
-          "z_mm": -228.6
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "skirt",
-        "label": "skirt_lw1",
-        "dims": {
-          "dx_mm": 50.8,
-          "dy_mm": 1320.8,
-          "dz_mm": 750.0
-        },
-        "center": {
-          "x_mm": -25.4,
-          "y_mm": 1979.6125000000002,
-          "z_mm": -375.0
-        }
-      },
-      {
-        "group": "foundation",
-        "kind": "beam",
-        "label": "beam_leB0",
+        "label": "beam_C",
         "dims": {
           "dx_mm": 304.8,
           "dy_mm": 1219.2,
@@ -1656,23 +231,8 @@
       },
       {
         "group": "foundation",
-        "kind": "skirt",
-        "label": "skirt_leB0",
-        "dims": {
-          "dx_mm": 50.8,
-          "dy_mm": 1320.8,
-          "dz_mm": 750.0
-        },
-        "center": {
-          "x_mm": 3683.0000000000005,
-          "y_mm": 760.4125,
-          "z_mm": -375.0
-        }
-      },
-      {
-        "group": "foundation",
         "kind": "beam",
-        "label": "beam_lstep0",
+        "label": "beam_D",
         "dims": {
           "dx_mm": 304.8,
           "dy_mm": 1219.2,
@@ -1686,16 +246,121 @@
       },
       {
         "group": "foundation",
+        "kind": "beam",
+        "label": "beam_E",
+        "dims": {
+          "dx_mm": 1219.2000000000003,
+          "dy_mm": 304.8,
+          "dz_mm": 457.2
+        },
+        "center": {
+          "x_mm": 3048.0,
+          "y_mm": 1445.41875,
+          "z_mm": -228.6
+        }
+      },
+      {
+        "group": "foundation",
+        "kind": "beam",
+        "label": "beam_F",
+        "dims": {
+          "dx_mm": 2438.4,
+          "dy_mm": 304.8,
+          "dz_mm": 457.2
+        },
+        "center": {
+          "x_mm": 1219.2,
+          "y_mm": 2664.61875,
+          "z_mm": -228.6
+        }
+      },
+      {
+        "group": "foundation",
         "kind": "skirt",
-        "label": "skirt_lstep0",
+        "label": "skirt_A",
+        "dims": {
+          "dx_mm": 3959.2250000000004,
+          "dy_mm": 50.8,
+          "dz_mm": 750.0
+        },
+        "center": {
+          "x_mm": 1828.8000000000002,
+          "y_mm": -25.4,
+          "z_mm": -375.0
+        }
+      },
+      {
+        "group": "foundation",
+        "kind": "skirt",
+        "label": "skirt_B",
         "dims": {
           "dx_mm": 50.8,
-          "dy_mm": 1320.8,
+          "dy_mm": 2740.025,
+          "dz_mm": 750.0
+        },
+        "center": {
+          "x_mm": -25.4,
+          "y_mm": 1370.0125,
+          "z_mm": -375.0
+        }
+      },
+      {
+        "group": "foundation",
+        "kind": "skirt",
+        "label": "skirt_C",
+        "dims": {
+          "dx_mm": 50.8,
+          "dy_mm": 1520.825,
+          "dz_mm": 750.0
+        },
+        "center": {
+          "x_mm": 3683.0000000000005,
+          "y_mm": 760.4125,
+          "z_mm": -375.0
+        }
+      },
+      {
+        "group": "foundation",
+        "kind": "skirt",
+        "label": "skirt_D",
+        "dims": {
+          "dx_mm": 50.8,
+          "dy_mm": 1520.825,
           "dz_mm": 750.0
         },
         "center": {
           "x_mm": 2463.8,
           "y_mm": 1979.6125000000002,
+          "z_mm": -375.0
+        }
+      },
+      {
+        "group": "foundation",
+        "kind": "skirt",
+        "label": "skirt_E",
+        "dims": {
+          "dx_mm": 1520.8250000000003,
+          "dy_mm": 50.8,
+          "dz_mm": 750.0
+        },
+        "center": {
+          "x_mm": 3048.0,
+          "y_mm": 1546.2250000000001,
+          "z_mm": -375.0
+        }
+      },
+      {
+        "group": "foundation",
+        "kind": "skirt",
+        "label": "skirt_F",
+        "dims": {
+          "dx_mm": 2740.025,
+          "dy_mm": 50.8,
+          "dz_mm": 750.0
+        },
+        "center": {
+          "x_mm": 1219.2,
+          "y_mm": 2765.425,
           "z_mm": -375.0
         }
       }

@@ -42,6 +42,68 @@ function near(a, b, label, errs) {
   return true;
 }
 
+// --- structural expectations (the anti-regression contract) ----------------
+// EXACT piece counts: monolithic slab (NOT per-row strips), one beam + one
+// skirt per perimeter RUN (NOT per wall module). slab is a range on the L
+// because cell quantization can split the silhouette into 2 or 3 maximal rects.
+const EXPECT = {
+  foundation_rect: { slab: [1, 1], beam: 4, skirt: 4 },
+  foundation_L:    { slab: [2, 3], beam: 6, skirt: 6 },
+};
+
+function aabbOf(pc) {
+  const { dx_mm: dx, dy_mm: dy } = pc.dims;
+  const { x_mm: cx, y_mm: cy } = pc.center;
+  return { x0: cx - dx / 2, x1: cx + dx / 2, y0: cy - dy / 2, y1: cy + dy / 2, cx, cy };
+}
+const letterOf = pc => pc.label.split('_')[1];
+
+// Continuity check: every building CORNER (derived from the BEAMS — one per run,
+// on the wall centerline, unaffected by any skirt bug) must be covered by a
+// skirt. If the corner-extension is missing, the corner-square sample falls in
+// the diagonal gap and is covered by NO skirt → fail. Returns [] or [errors].
+function skirtContinuityErrors(pieces) {
+  const PAD = 1e-6;
+  const T = 304.8; // ~beam width — corner = a run end meeting a perpendicular run line
+  const beams = pieces.filter(p => p.kind === 'beam').map(p => {
+    const a = aabbOf(p);
+    const horiz = p.dims.dx_mm >= p.dims.dy_mm;
+    return { letter: letterOf(p), horiz, a };
+  });
+  const skirts = {};
+  for (const p of pieces.filter(p => p.kind === 'skirt')) skirts[letterOf(p)] = aabbOf(p);
+  const skirtAABBs = Object.values(skirts);
+  const inside = (x, y) => skirtAABBs.some(s =>
+    x >= s.x0 - PAD && x <= s.x1 + PAD && y >= s.y0 - PAD && y <= s.y1 + PAD);
+
+  const errs = [];
+  const hs = beams.filter(b => b.horiz), vs = beams.filter(b => !b.horiz);
+  for (const h of hs) for (const v of vs) {
+    const hy = h.a.cy;                 // horiz run centerline y
+    const vx = v.a.cx;                 // vert run centerline x
+    const nearXend = Math.min(Math.abs(vx - h.a.x0), Math.abs(vx - h.a.x1)) <= T;
+    const nearYend = Math.min(Math.abs(hy - v.a.y0), Math.abs(hy - v.a.y1)) <= T;
+    if (!(nearXend && nearYend)) continue; // not a corner of the building
+    // sample the corner square at the crossing of the two skirts' thin bands
+    const sx = skirts[v.letter].cx, sy = skirts[h.letter].cy;
+    if (!inside(sx, sy)) errs.push(`corner ${h.letter}×${v.letter} @ (${sx.toFixed(1)},${sy.toFixed(1)}) not covered by any skirt`);
+  }
+  return errs;
+}
+
+function structuralErrors(name, pieces) {
+  const exp = EXPECT[name];
+  if (!exp) return [];
+  const errs = [];
+  const count = k => pieces.filter(p => p.kind === k).length;
+  const slab = count('slab'), beam = count('beam'), skirt = count('skirt');
+  if (slab < exp.slab[0] || slab > exp.slab[1]) errs.push(`slab count ${slab} not in [${exp.slab}] (monolithic, not per-row strips)`);
+  if (beam !== exp.beam) errs.push(`beam count ${beam}, expected ${exp.beam} (one per run)`);
+  if (skirt !== exp.skirt) errs.push(`skirt count ${skirt}, expected ${exp.skirt} (one per run)`);
+  errs.push(...skirtContinuityErrors(pieces));
+  return errs;
+}
+
 for (const [name, want] of Object.entries(golden)) {
   const data = JSON.parse(readFileSync(path.join(fixDir, `${name}.json`), 'utf8'));
   const ents = (data.entities || data.modules || []).map(adapt);
@@ -56,6 +118,8 @@ for (const [name, want] of Object.entries(golden)) {
   const got = foundationSolids(want.params, silhouette);
 
   const errs = [];
+  // structural contract (exact run counts + gapless skirt loop) on the JS output
+  errs.push(...structuralErrors(name, got));
   if (got.length !== want.pieces.length) {
     errs.push(`piece count: got ${got.length}, expected ${want.pieces.length}`);
   }
