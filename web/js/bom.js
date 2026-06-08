@@ -111,9 +111,9 @@ export function aggregateLineItems(entities) {
   return agg;
 }
 
-// Flat priced catalog (lumber + hardware), or {} before pricing loads.
+// Flat priced catalog (lumber + hardware + foundation), or {} before pricing loads.
 export function getCatalog() {
-  return pricingData ? { ...pricingData.lumber, ...pricingData.hardware } : {};
+  return pricingData ? { ...pricingData.lumber, ...pricingData.hardware, ...pricingData.foundation } : {};
 }
 
 // Friendly part name per member role (cut-list display only; summation stays generic).
@@ -171,6 +171,34 @@ export function foundationEstimate(entities) {
   return { concrete_m3, eps_m2, eps_sf: eps_m2 * 10.7639 };
 }
 
+// Foundation line items priced into the aggregate, derived from the SAME
+// foundationEstimate() quantities the BOM displays (concrete m³, EPS skirt sf),
+// so the visible rows and the dollar total can never disagree. Does NOT re-derive
+// quantities — wiring only (skirt geometry itself is CAD-AUD-004, out of scope).
+export function foundationLineItems(entities) {
+  const fe = foundationEstimate(entities);
+  if (!fe) return [];
+  return [
+    { material_key: 'concrete_m3', qty: fe.concrete_m3, unit: 'm3' },
+    { material_key: 'eps_skirt_sf', qty: fe.eps_sf, unit: 'sf' },
+  ];
+}
+
+// THE total: framing aggregate + foundation line items, priced against the flat
+// catalog. Pure over (entities, catalog) so updateBOM and tests share one path.
+export function computeTotalCost(entities, catalog) {
+  const agg = aggregateLineItems(entities);
+  for (const li of foundationLineItems(entities)) {
+    agg[li.material_key] = (agg[li.material_key] || 0) + li.qty;
+  }
+  let total = 0;
+  for (const [key, qty] of Object.entries(agg)) {
+    const c = catalog[key];
+    if (c) total += qty * c.unit_price;
+  }
+  return total;
+}
+
 export function updateBOM() {
   const el = document.getElementById('bom-content');
   if (!el) return;
@@ -180,14 +208,10 @@ export function updateBOM() {
     return;
   }
 
-  // Generic aggregate, priced against the flat catalog. No framing concepts here.
+  // Generic aggregate, priced against the flat catalog (framing + foundation).
   const catalog = getCatalog();
   const agg = aggregateLineItems(placed);
-  let totalCost = 0;
-  for (const [key, qty] of Object.entries(agg)) {
-    const c = catalog[key];
-    if (c) totalCost += qty * c.unit_price;
-  }
+  const totalCost = computeTotalCost(placed, catalog);
 
   const b = framingBreakdown(placed);
   const totalOSB = agg['osb_7_16_4x8'] || 0;

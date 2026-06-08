@@ -20,6 +20,10 @@
     "nail_16d_sinker": { "description": "16d sinker nail (3-1/4\")", "unit_price": 0.08, "unit": "each" },
     "screw_3in": { "description": "3\" structural screw", "unit_price": 0.15, "unit": "each" }
   },
+  "foundation": {
+    "concrete_m3": { "description": "Ready-mix concrete, in place", "unit_price": 200.00, "unit": "m3", "todo": "confirm price" },
+    "eps_skirt_sf": { "description": "EPS frost skirt insulation", "unit_price": 0.85, "unit": "sf", "todo": "confirm price" }
+  },
   "module_specs": {
     "wall_4x8_2x6_16oc": {
       "osb_sheets": 1,
