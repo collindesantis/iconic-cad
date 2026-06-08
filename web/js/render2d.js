@@ -14,9 +14,15 @@ const ctx = canvas.getContext('2d');
 const wrap = document.getElementById('canvas-wrap');
 
 export function resizeCanvas() {
+  // While #canvas-wrap is hidden (Foundation/3D trades set display:none) its
+  // clientWidth/Height are 0. A window-resize firing then would zero the canvas
+  // and blank the Framing review on return — so skip. switchTab('2d') re-runs
+  // this once the wrapper is visible again. Returns whether a resize happened.
+  if (!wrap.clientWidth || !wrap.clientHeight) return false;
   canvas.width = wrap.clientWidth;
   canvas.height = wrap.clientHeight;
   draw2d();
+  return true;
 }
 
 // =====================================================

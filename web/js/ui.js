@@ -13,6 +13,7 @@ import { mmToPx, pxToMm } from './view.js';
 import { findSnap, wouldOverlap } from './snap.js';
 import { regionForLevel } from './region.js';
 import { markModelChanged, requestDraw } from './app.js';
+import { resizeCanvas } from './render2d.js';
 import { setViewport, resize3d, set3dPreviewEnabled } from './render3d.js';
 import { cardHover, cardLeave } from './card_preview3d.js';
 import { exportJSON, saveLayout, loadLayout } from './io.js';
@@ -443,6 +444,10 @@ export function switchTab(name) {
     // Restore sidebar preview state.
     document.getElementById('preview-wrap').style.display = '';
     set3dPreviewEnabled(_preview3dOn);
+    // Wrapper is visible again — size the canvas and redraw NOW. While hidden a
+    // window resize is a no-op (resizeCanvas guards on zero size), so returning
+    // to Framing from Foundation/3D must force this or the review shows blank.
+    resizeCanvas();
   }
   setViewport(name);
 }
