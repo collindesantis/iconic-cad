@@ -54,9 +54,18 @@ const matIWallLumberT = new THREE.MeshLambertMaterial({ color: 0xc4a882, ...TMAT
 
 // Foundation materials — concrete gray slab/beam, EPS-foam pink skirt.
 const matConcrete = new THREE.MeshLambertMaterial({ color: 0x9a9a9a });
-// EPS skirt — always a touch transparent in every view (sidebar preview,
-// foundation review, 3d preview) so it reads as foam, not concrete.
-const matEPS      = new THREE.MeshLambertMaterial({ color: 0xd98cb3, transparent: true, opacity: 0.6 });
+// EPS skirt — more transparent than the beam/slab so it clearly reads as foam.
+const matEPS      = new THREE.MeshLambertMaterial({ color: 0xd98cb3, transparent: true, opacity: 0.35 });
+
+// Foundation layer visibility (toggled from the foundation-review UI).
+let _showBeam  = true;
+let _showSkirt = true;
+
+export function setFoundationLayerVisible(layer, on) {
+  if (layer === 'beam')  _showBeam  = on;
+  if (layer === 'skirt') _showSkirt = on;
+  rebuildModel3D();
+}
 
 // Render mode: 'solid' (default — framing + foundation solid, the 3D PREVIEW
 // trade) vs 'foundation-review' (framing transparent, foundation solid). Set by
@@ -228,6 +237,8 @@ function buildFoundation3D(foundation, minX, minY) {
   };
 
   for (const pc of foundationSolids(foundation.params, silhouette)) {
+    if (pc.kind === 'beam'  && !_showBeam)  continue;
+    if (pc.kind === 'skirt' && !_showSkirt) continue;
     const mat = pc.kind === 'skirt' ? matEPS : matConcrete;
     addBoxTo(modelRoot, pc.dims.dx_mm, pc.dims.dy_mm, pc.dims.dz_mm,
       pc.center.x_mm - minX,

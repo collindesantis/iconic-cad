@@ -8,8 +8,12 @@
  * region flood-fill (region.js computeRegion) + foundation derivation
  * (foundation_geom.js foundationSolids) over the SAME fixtures and asserts the
  * ordered piece list (labels, kinds, dims, centers) matches within tolerance —
- * exercising both a rectangular AND an L-shaped silhouette so the flood-fill
- * parity is actually tested.
+ * exercising both a rectangular AND an L-shaped silhouette.
+ *
+ * Structural contract (beyond byte parity): BOTH the grade-beam RING and the
+ * frost-skirt LOOP are sets of NON-OVERLAPPING boxes forming a single connected
+ * loop with an open interior. The skirt sits 1" outside the beam outer face and
+ * 1" below the beam top.
  *
  * Parity contract: foundation_geom.js <-> foundation_lib.py must stay in sync.
  */
@@ -18,7 +22,7 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 
 import { computeRegion } from '../web/js/region.js';
-import { foundationSolids, computeFoundationRuns, skirtEndExt } from '../web/js/foundation_geom.js';
+import { foundationSolids } from '../web/js/foundation_geom.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixDir = path.join(__dirname, 'fixtures');
@@ -26,8 +30,9 @@ const fixDir = path.join(__dirname, 'fixtures');
 const golden = JSON.parse(readFileSync(path.join(fixDir, 'foundation_golden.json'), 'utf8'));
 const TOL = 1e-6; // mm — both sides are float64 doing the same arithmetic
 
-// Adapt a JSON entity (module/direction/width_mm/depth_mm) to the in-memory
-// shape region.js / foundation_geom.js consume (mod object + dir).
+const INSET_MM = 25.4;   // skirt 1" outside beam outer face
+const BEAM_TOP_Z = -5;   // beam top 5 mm below slab datum
+
 function adapt(e) {
   return {
     id: e.id, kind: e.kind, dir: e.direction, x_mm: e.x_mm, y_mm: e.y_mm,
@@ -42,13 +47,11 @@ function near(a, b, label, errs) {
   return true;
 }
 
-// --- structural expectations (the anti-regression contract) ----------------
-// EXACT piece counts: monolithic slab (NOT per-row strips), one beam + one
-// skirt per perimeter RUN (NOT per wall module). slab is a range on the L
-// because cell quantization can split the silhouette into 2 or 3 maximal rects.
+// slab exact-ish; beam + skirt are loops of N boxes (footprint-dependent), so
+// assert a sane range plus structural loop checks rather than an exact count.
 const EXPECT = {
-  foundation_rect: { slab: [1, 1], beam: 4, skirt: 4 },
-  foundation_L:    { slab: [2, 3], beam: 6, skirt: 6 },
+  foundation_rect: { slab: [1, 1], beam: [4, 8], skirt: [4, 8] },
+  foundation_L:    { slab: [2, 3], beam: [6, 12], skirt: [6, 12] },
 };
 
 function aabbOf(pc) {
@@ -56,97 +59,76 @@ function aabbOf(pc) {
   const { x_mm: cx, y_mm: cy } = pc.center;
   return { x0: cx - dx / 2, x1: cx + dx / 2, y0: cy - dy / 2, y1: cy + dy / 2, cx, cy };
 }
-const letterOf = pc => pc.label.split('_')[1];
 
-// Continuity check: every building CORNER (derived from the BEAMS — one per run,
-// on the wall centerline, unaffected by any skirt bug) must be covered by a
-// skirt. If the corner-extension is missing, the corner-square sample falls in
-// the diagonal gap and is covered by NO skirt → fail. Returns [] or [errors].
-function skirtContinuityErrors(pieces) {
-  const PAD = 1e-6;
-  const T = 304.8; // ~beam width — corner = a run end meeting a perpendicular run line
-  const beams = pieces.filter(p => p.kind === 'beam').map(p => {
-    const a = aabbOf(p);
-    const horiz = p.dims.dx_mm >= p.dims.dy_mm;
-    return { letter: letterOf(p), horiz, a };
-  });
-  const skirts = {};
-  for (const p of pieces.filter(p => p.kind === 'skirt')) skirts[letterOf(p)] = aabbOf(p);
-  const skirtAABBs = Object.values(skirts);
-  const inside = (x, y) => skirtAABBs.some(s =>
-    x >= s.x0 - PAD && x <= s.x1 + PAD && y >= s.y0 - PAD && y <= s.y1 + PAD);
-
-  const errs = [];
-  const hs = beams.filter(b => b.horiz), vs = beams.filter(b => !b.horiz);
-  for (const h of hs) for (const v of vs) {
-    const hy = h.a.cy;                 // horiz run centerline y
-    const vx = v.a.cx;                 // vert run centerline x
-    const nearXend = Math.min(Math.abs(vx - h.a.x0), Math.abs(vx - h.a.x1)) <= T;
-    const nearYend = Math.min(Math.abs(hy - v.a.y0), Math.abs(hy - v.a.y1)) <= T;
-    if (!(nearXend && nearYend)) continue; // not a corner of the building
-    // sample the corner square at the crossing of the two skirts' thin bands
-    const sx = skirts[v.letter].cx, sy = skirts[h.letter].cy;
-    if (!inside(sx, sy)) errs.push(`corner ${h.letter}×${v.letter} @ (${sx.toFixed(1)},${sy.toFixed(1)}) not covered by any skirt`);
+// NO OVERLAP: no two boxes of `kind` share positive plan area.
+function overlapErrors(pieces, kind) {
+  const bs = pieces.filter(p => p.kind === kind).map(aabbOf);
+  const PAD = 1e-6, errs = [];
+  for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
+    const a = bs[i], b = bs[j];
+    const ox = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0);
+    const oy = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0);
+    if (ox > PAD && oy > PAD) errs.push(`${kind} boxes [${i}]&[${j}] overlap by ${ox.toFixed(1)}×${oy.toFixed(1)}`);
   }
   return errs;
 }
 
-// Per-end extension check: a skirt end may extend MORE than skirtT past its run's
-// aMin/aMax ONLY if a perpendicular run butts that end (submissive). Dominant ends
-// must extend ≤ skirtT. Uses actual wall run geometry (nearCross, depth) so the
-// check mirrors the implementation's own classification, not the beam widths.
-function perEndExtensionErrors(pieces, runs, params) {
-  const skirtT = params.skirt_thickness_mm;
-  const TOL = 1.0; // mm
+// SINGLE LOOP: boxes of `kind` form one connected component (touching counts).
+function loopErrors(pieces, kind) {
+  const bs = pieces.filter(p => p.kind === kind).map(aabbOf);
+  if (bs.length < 2) return [];
+  const E = 0.01;
+  const touch = (a, b) =>
+    (Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) > -E &&
+    (Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0)) > -E;
+  const par = bs.map((_, i) => i);
+  const find = x => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
+  for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++)
+    if (touch(bs[i], bs[j])) par[find(i)] = find(j);
+  const comps = new Set(bs.map((_, i) => find(i)));
+  return comps.size === 1 ? [] : [`${kind} is ${comps.size} components, not one connected loop`];
+}
+
+// OPEN INTERIOR: the beam is a RING — a slab interior sample must NOT be covered
+// by any beam box (proves it's a ring, not a filled blob).
+function beamRingHoleErrors(pieces) {
+  const beams = pieces.filter(p => p.kind === 'beam').map(aabbOf);
+  const slabs = pieces.filter(p => p.kind === 'slab').map(aabbOf);
   const errs = [];
-
-  for (const s of pieces.filter(p => p.kind === 'skirt')) {
-    const sLetter = letterOf(s);
-    const run = runs.find(r => r.letter === sLetter);
-    if (!run) continue;
-    const sa = aabbOf(s);
-    const horiz = s.dims.dx_mm > s.dims.dy_mm;
-    const sAMin = horiz ? sa.x0 : sa.y0;
-    const sAMax = horiz ? sa.x1 : sa.y1;
-    const extAtMin = run.aMin - sAMin;
-    const extAtMax = sAMax - run.aMax;
-
-    const checkEnd = (ext, endCoord, side) => {
-      if (ext <= skirtT + TOL) return; // dominant (0) or negligible — OK
-      // extension > skirtT: verify a perp run actually butts this end
-      const expected = skirtEndExt(run, endCoord, runs, skirtT);
-      if (expected <= skirtT + TOL) errs.push(
-        `skirt_${sLetter} ${side} extends ${ext.toFixed(1)} mm past run end ` +
-        `but no perp run crosses there (dominant end must not extend)`
-      );
-    };
-
-    checkEnd(extAtMin, run.aMin, 'aMin');
-    checkEnd(extAtMax, run.aMax, 'aMax');
+  for (const s of slabs) {
+    if (beams.some(b => s.cx > b.x0 && s.cx < b.x1 && s.cy > b.y0 && s.cy < b.y1))
+      errs.push(`slab center (${s.cx.toFixed(1)},${s.cy.toFixed(1)}) is inside a beam — ring not open`);
   }
   return errs;
 }
 
-// Assert the L fixture has at least one run with one dominant + one submissive end
-// (the mixed case proves per-end classification is actually happening).
-function lMixedEndErrors(pieces, runs, params) {
-  const skirtT = params.skirt_thickness_mm;
-  const TOL = 1.0;
-  const errs = [];
-
-  let mixedFound = false;
+// 1" GAP: each skirt box sits exactly INSET_MM from its nearest facing beam.
+function skirtGapErrors(pieces) {
+  const beams = pieces.filter(p => p.kind === 'beam').map(aabbOf);
+  const TOLmm = 0.5, errs = [];
   for (const s of pieces.filter(p => p.kind === 'skirt')) {
-    const run = runs.find(r => r.letter === letterOf(s));
-    if (!run) continue;
     const sa = aabbOf(s);
-    const horiz = s.dims.dx_mm > s.dims.dy_mm;
-    const extMin = run.aMin - (horiz ? sa.x0 : sa.y0);
-    const extMax = (horiz ? sa.x1 : sa.y1) - run.aMax;
-    const domMin = extMin <= skirtT + TOL;
-    const domMax = extMax <= skirtT + TOL;
-    if (domMin !== domMax) { mixedFound = true; break; }
+    let best = Infinity;
+    for (const b of beams) {
+      const sepx = Math.max(sa.x0 - b.x1, b.x0 - sa.x1);
+      const sepy = Math.max(sa.y0 - b.y1, b.y0 - sa.y1);
+      if (sepx <= 0 && sepy > 0) best = Math.min(best, sepy);
+      else if (sepy <= 0 && sepx > 0) best = Math.min(best, sepx);
+    }
+    if (Math.abs(best - INSET_MM) > TOLmm) errs.push(`${s.label} nearest-beam gap ${best.toFixed(2)} != 1" (${INSET_MM})`);
   }
-  if (!mixedFound) errs.push('no run has exactly one dominant end and one submissive end (L-shape must have mixed runs)');
+  return errs;
+}
+
+// Z: skirt height = beamD - 1", top 1" below beam top.
+function skirtZErrors(pieces, params) {
+  const beamD = params.beam_d_mm, TOLmm = 0.1, errs = [];
+  const expDZ = beamD - INSET_MM;
+  const expCZ = (BEAM_TOP_Z - INSET_MM) - expDZ / 2;
+  for (const s of pieces.filter(p => p.kind === 'skirt')) {
+    if (Math.abs(s.dims.dz_mm - expDZ) > TOLmm) errs.push(`${s.label} dz ${s.dims.dz_mm.toFixed(2)} != ${expDZ.toFixed(2)}`);
+    if (Math.abs(s.center.z_mm - expCZ) > TOLmm) errs.push(`${s.label} cz ${s.center.z_mm.toFixed(2)} != ${expCZ.toFixed(2)}`);
+  }
   return errs;
 }
 
@@ -155,11 +137,16 @@ function structuralErrors(name, pieces) {
   if (!exp) return [];
   const errs = [];
   const count = k => pieces.filter(p => p.kind === k).length;
+  const inRange = (n, [lo, hi]) => n >= lo && n <= hi;
   const slab = count('slab'), beam = count('beam'), skirt = count('skirt');
-  if (slab < exp.slab[0] || slab > exp.slab[1]) errs.push(`slab count ${slab} not in [${exp.slab}] (monolithic, not per-row strips)`);
-  if (beam !== exp.beam) errs.push(`beam count ${beam}, expected ${exp.beam} (one per run)`);
-  if (skirt !== exp.skirt) errs.push(`skirt count ${skirt}, expected ${exp.skirt} (one per run)`);
-  errs.push(...skirtContinuityErrors(pieces));
+  if (slab < exp.slab[0] || slab > exp.slab[1]) errs.push(`slab count ${slab} not in [${exp.slab}]`);
+  if (!inRange(beam, exp.beam)) errs.push(`beam count ${beam} not in [${exp.beam}]`);
+  if (!inRange(skirt, exp.skirt)) errs.push(`skirt count ${skirt} not in [${exp.skirt}]`);
+  errs.push(...overlapErrors(pieces, 'beam'));
+  errs.push(...loopErrors(pieces, 'beam'));
+  errs.push(...beamRingHoleErrors(pieces));
+  errs.push(...overlapErrors(pieces, 'skirt'));
+  errs.push(...loopErrors(pieces, 'skirt'));
   return errs;
 }
 
@@ -175,37 +162,19 @@ for (const [name, want] of Object.entries(golden)) {
     cell_mm: region.cells ? region.cells.cell_mm : undefined,
   };
   const got = foundationSolids(want.params, silhouette);
-  const runs = computeFoundationRuns(silhouette.walls);
 
   const errs = [];
-  // structural contract (exact run counts + gapless skirt loop) on the JS output
   errs.push(...structuralErrors(name, got));
-  // per-end rule: dominant ends must not extend > skirtT past run wall extent
-  errs.push(...perEndExtensionErrors(got, runs, want.params));
-  // L fixture: at least one run must have one dominant + one submissive end
-  if (name === 'foundation_L') errs.push(...lMixedEndErrors(got, runs, want.params));
+  errs.push(...skirtGapErrors(got));
+  errs.push(...skirtZErrors(got, want.params));
 
-  // OUTSIDE assertion: every skirt must sit on the exterior. A skirt placed on
-  // the wrong face (probe bug) has its center inside the building. Probe ±cell in
-  // the skirt's thin dimension: a correctly placed skirt has one probe clearly in
-  // FLOOD (exterior), a flipped skirt has both probes inside (WALL or interior).
-  // We probe ±cell rather than the center itself because the region grid can
-  // over-mark exterior cells within 1 cell of the wall outer face as WALL.
-  const cell = silhouette.cell_mm || 76.2;
+  // OUTSIDE assertion: every skirt box center must be exterior.
   for (const p of got.filter(p => p.kind === 'skirt')) {
-    const { x_mm: cx, y_mm: cy } = p.center;
-    const horiz = p.dims.dx_mm > p.dims.dy_mm;
-    const outside = horiz
-      ? (!silhouette.containsPoint(cx, cy - cell) || !silhouette.containsPoint(cx, cy + cell))
-      : (!silhouette.containsPoint(cx - cell, cy) || !silhouette.containsPoint(cx + cell, cy));
-    if (!outside) {
-      errs.push(`skirt ${p.label} center (${cx.toFixed(1)},${cy.toFixed(1)}) — both ±cell probes inside silhouette, skirt likely on wrong face`);
-    }
+    if (silhouette.containsPoint(p.center.x_mm, p.center.y_mm))
+      errs.push(`skirt ${p.label} center is inside the silhouette (should be exterior)`);
   }
 
-  if (got.length !== want.pieces.length) {
-    errs.push(`piece count: got ${got.length}, expected ${want.pieces.length}`);
-  }
+  if (got.length !== want.pieces.length) errs.push(`piece count: got ${got.length}, expected ${want.pieces.length}`);
   const n = Math.min(got.length, want.pieces.length);
   for (let i = 0; i < n; i++) {
     const g = got[i], w = want.pieces[i];

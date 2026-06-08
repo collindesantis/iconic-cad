@@ -18,7 +18,7 @@
 import { doc, ui } from './state.js';
 import { regionForLevel } from './region.js';
 import { switchTab } from './ui.js';
-import { setRenderMode, resize3d } from './render3d.js';
+import { setRenderMode, resize3d, setFoundationLayerVisible } from './render3d.js';
 import { openFoundationModal } from './foundation.js';
 import { markModelChanged } from './app.js';
 
@@ -73,10 +73,11 @@ function applyLayout(trade) {
   const footer = document.getElementById('footer-bar');
   if (footer) footer.style.display = is3d ? 'none' : '';
 
+  const inFoundation = trade === 'foundation';
   if (trade === 'framing') {
     switchTab('2d');
     setRenderMode('solid');
-  } else if (trade === 'foundation') {
+  } else if (inFoundation) {
     switchTab('3d');
     setRenderMode('foundation-review');
   } else {
@@ -85,6 +86,10 @@ function applyLayout(trade) {
   }
   if (is3d) resize3d(); // viewport reclaims the hidden library tray
   document.getElementById('next-trade-wrap')?.classList.toggle('lowered', is3d);
+
+  // Show/hide the beam+skirt layer toggles in the 3D viewport.
+  const layerCtrl = document.getElementById('fnd-layer-controls');
+  if (layerCtrl) layerCtrl.style.display = inFoundation ? '' : 'none';
 
   // Dim + disable framing controls when viewing a locked framing trade.
   const locked = trade === 'framing' && ui.reachedTrade > 0;
@@ -196,6 +201,14 @@ export function initTrades() {
   });
   document.getElementById('btn-next-trade')?.addEventListener('click', onNext);
   document.getElementById('btn-edit-trade')?.addEventListener('click', onEdit);
+
+  // Foundation layer toggles — each checkbox independently shows/hides its layer.
+  document.getElementById('fnd-show-beam')?.addEventListener('change', e => {
+    setFoundationLayerVisible('beam', e.target.checked);
+  });
+  document.getElementById('fnd-show-skirt')?.addEventListener('change', e => {
+    setFoundationLayerVisible('skirt', e.target.checked);
+  });
 
   // GO in the foundation popup wrote the entity → enter review + re-gate.
   window.addEventListener('iconic:foundation', () => {

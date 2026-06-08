@@ -374,11 +374,14 @@ def _camera_settings(bb):
     return "&#10;".join(lines)
 
 
-def write_gui_document(out_abs, doc):
+def write_gui_document(out_abs, doc, hidden_names=()):
     """Inject GuiDocument.xml (per-object Visibility + saved camera) into the
     saved .FCStd. freecadcmd has no GUI so saveAs writes no GuiDocument.xml,
     which makes FreeCAD open the objects hidden with a non-deterministic camera.
-    Mirrors web/js/fcstd.js guiDocumentXml."""
+    Mirrors web/js/fcstd.js guiDocumentXml. Objects whose name is in
+    hidden_names get Visibility=false (folder visibility does NOT cascade to
+    children in FreeCAD, so hidden pieces must be hidden per-part)."""
+    hidden = set(hidden_names)
     objs = [o for o in doc.Objects if hasattr(o, "Shape") and o.Shape.Volume != 0]
     if not objs:
         return
@@ -388,9 +391,10 @@ def write_gui_document(out_abs, doc):
     vps = "".join(
         '        <ViewProvider name="%s" expanded="0">\n'
         '            <Properties Count="1" TransientCount="0">\n'
-        '                <Property name="Visibility" type="App::PropertyBool"><Bool value="true"/></Property>\n'
+        '                <Property name="Visibility" type="App::PropertyBool"><Bool value="%s"/></Property>\n'
         '            </Properties>\n'
-        '        </ViewProvider>\n' % o.Name for o in objs)
+        '        </ViewProvider>\n' % (o.Name, "false" if o.Name in hidden else "true")
+        for o in objs)
     xml = (
         "<?xml version='1.0' encoding='utf-8'?>\n"
         "<!DOCTYPE GuiDocument>\n"
@@ -514,14 +518,27 @@ def main():
     # rectangular Part box placed at z<=0 (below the framing). Same world->FreeCAD
     # transform as the walls: plan (X,Y) -> (X-min_x, -(Y-min_y)); boxes are
     # symmetric so a plain placement (no mirror_y) lands them correctly.
+    hidden_names = []  # parts to write Visibility=false in GuiDocument (skirt)
     if foundation_ent and foundation_ent.get("params"):
         l1_walls = [m for m in modules
                     if m.get("kind") == "wall" and m.get("level", "L1") == "L1"]
         if l1_walls:
-            fgroup = doc.addObject("App::DocumentObjectGroup", "Foundation")
-            fgroup.Label = "Foundation"
             silhouette = silhouette_for_walls(l1_walls)
             pieces = foundation_solids(foundation_ent["params"], silhouette)
+
+            # Create sub-folders: Slab + Beam (visible), Skirt (invisible default).
+            fslab_group = doc.addObject("App::DocumentObjectGroup", "Foundation_Slab")
+            fslab_group.Label = "Foundation_Slab"
+            fbeam_group = doc.addObject("App::DocumentObjectGroup", "Foundation_Beam")
+            fbeam_group.Label = "Foundation_Beam"
+            fskirt_group = doc.addObject("App::DocumentObjectGroup", "Foundation_Skirt")
+            fskirt_group.Label = "Foundation_Skirt"
+            if fskirt_group.ViewObject:
+                fskirt_group.ViewObject.Visibility = False
+
+            fgroup = doc.addObject("App::DocumentObjectGroup", "Foundation")
+            fgroup.Label = "Foundation"
+
             for pc in pieces:
                 dx, dy, dz = pc["dims"]["dx_mm"], pc["dims"]["dy_mm"], pc["dims"]["dz_mm"]
                 fx = pc["center"]["x_mm"] - min_x
@@ -534,8 +551,19 @@ def main():
                 fobj.Shape = box
                 fobj.Label = name
                 if fobj.ViewObject:
-                    fobj.ViewObject.Visibility = True
-                fgroup.addObject(fobj)
+                    fobj.ViewObject.Visibility = pc["kind"] != "skirt"
+                if pc["kind"] == "skirt":
+                    hidden_names.append(name)  # hide per-part (folder vis doesn't cascade)
+                if pc["kind"] == "slab":
+                    fslab_group.addObject(fobj)
+                elif pc["kind"] == "beam":
+                    fbeam_group.addObject(fobj)
+                else:
+                    fskirt_group.addObject(fobj)
+
+            fgroup.addObject(fslab_group)
+            fgroup.addObject(fbeam_group)
+            fgroup.addObject(fskirt_group)
             print(f"Foundation: {len(pieces)} pieces "
                   f"({len(silhouette['rects'])} slab rects)")
 
@@ -543,7 +571,7 @@ def main():
     out = os.path.splitext(json_path)[0] + ".FCStd"
     out_abs = os.path.abspath(out)
     doc.saveAs(out_abs)
-    write_gui_document(out_abs, doc)
+    write_gui_document(out_abs, doc, hidden_names)
     print(f"\nSaved {out_abs} ({len(modules)} walls, {blocking_idx} blocking pieces)")
 
 

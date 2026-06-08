@@ -156,14 +156,15 @@ function createBlocking(conn, byId, minx, miny) {
   return out;
 }
 
-function objBlock(name, label) {
+function objBlock(name, label, visible = true) {
   // App-side Visibility is required: with a GuiDocument.xml present, FreeCAD
   // blanks objects whose App object has no Visibility property (even though the
   // Gui ViewProvider says visible). The terminal/FreeCAD-written Document.xml
-  // includes it; we must too.
+  // includes it; we must too. Folder visibility does NOT cascade to children,
+  // so a hidden piece (e.g. skirt) must carry Visibility=false on the part.
   return `        <Object name="${name}"><Properties Count="4" TransientCount="0">
                 <Property name="Label" type="App::PropertyString" status="134217728"><String value="${label}"/></Property>
-                <Property name="Visibility" type="App::PropertyBool" status="1"><Bool value="true"/></Property>
+                <Property name="Visibility" type="App::PropertyBool" status="1"><Bool value="${visible ? 'true' : 'false'}"/></Property>
                 <Property name="Placement" type="App::PropertyPlacement" status="8388608"><PropertyPlacement Px="0.0" Py="0.0" Pz="0.0" Q0="0.0" Q1="0.0" Q2="0.0" Q3="1.0" A="0.0" Ox="0.0" Oy="0.0" Oz="1.0"/></Property>
                 <Property name="Shape" type="Part::PropertyPartShape"><Part file="${name}.brp"/><ElementMap/></Property>
         </Properties></Object>\n`;
@@ -172,8 +173,9 @@ function objBlock(name, label) {
 // references the child object names, so FreeCAD opens it as an expandable folder
 // (not flat name-prefixed solids). Format mirrors what FreeCAD itself writes
 // (GroupExtension + LinkList), trimmed to the properties FreeCAD needs to restore.
-function groupBlock(name, label, children) {
+function groupBlock(name, label, children, visible = true) {
   const links = children.map(c => `                    <Link value="${c}"/>`).join('\n');
+  const visStr = visible ? 'true' : 'false';
   return `        <Object name="${name}" Extensions="True">
             <Extensions Count="1">
                 <Extension type="App::GroupExtension" name="GroupExtension"/>
@@ -185,7 +187,7 @@ ${links}
                     </LinkList>
                 </Property>
                 <Property name="Label" type="App::PropertyString" status="134217728"><String value="${label}"/></Property>
-                <Property name="Visibility" type="App::PropertyBool" status="1"><Bool value="true"/></Property>
+                <Property name="Visibility" type="App::PropertyBool" status="1"><Bool value="${visStr}"/></Property>
             </Properties>
         </Object>\n`;
 }
@@ -202,8 +204,8 @@ function documentXml(parts, groups) {
     `        </ObjectDeps>\n`).join('');
   const partDecl = parts.map((o, i) => `        <Object type="Part::Feature" name="${o.name}" id="${2000 + i}" />\n`).join('');
   const groupDecl = groups.map((g, i) => `        <Object type="App::DocumentObjectGroup" name="${g.name}" id="${2000 + parts.length + i}" />\n`).join('');
-  const partData = parts.map(o => objBlock(o.name, o.label)).join('');
-  const groupData = groups.map(g => groupBlock(g.name, g.label, g.children)).join('');
+  const partData = parts.map(o => objBlock(o.name, o.label, o.visible !== false)).join('');
+  const groupData = groups.map(g => groupBlock(g.name, g.label, g.children, g.visible !== false)).join('');
   return `<?xml version='1.0' encoding='utf-8'?>
 <Document SchemaVersion="4" FileVersion="1">
     <Properties Count="1" TransientCount="0"><Property name="Label" type="App::PropertyString" status="16777217"><String value="IconicCAD"/></Property></Properties>
@@ -244,22 +246,23 @@ function cameraSettings(b) {
 // One ViewProvider per object. Visibility=true always; foundation pieces also
 // carry a ShapeColor (concrete-gray / EPS-pink) so the slab/beam/skirt read
 // distinctly. Group folders get a ViewProvider too (visibility only).
-function viewProvider(name, color) {
+function viewProvider(name, color, visible = true) {
   const hasColor = color != null;
+  const visStr = visible ? 'true' : 'false';
   const colorProp = hasColor ? `
                 <Property name="ShapeColor" type="App::PropertyColor">
                     <PropertyColor value="${color}"/>
                 </Property>` : '';
   return `        <ViewProvider name="${name}" expanded="0">
             <Properties Count="${hasColor ? 2 : 1}" TransientCount="0">
-                <Property name="Visibility" type="App::PropertyBool"><Bool value="true"/></Property>${colorProp}
+                <Property name="Visibility" type="App::PropertyBool"><Bool value="${visStr}"/></Property>${colorProp}
             </Properties>
         </ViewProvider>\n`;
 }
 function guiDocumentXml(parts, groups, bounds) {
   const total = parts.length + groups.length;
-  const vps = parts.map(o => viewProvider(o.name, o.color)).join('')
-            + groups.map(g => viewProvider(g.name)).join('');
+  const vps = parts.map(o => viewProvider(o.name, o.color, o.visible !== false)).join('')
+            + groups.map(g => viewProvider(g.name, undefined, g.visible !== false)).join('');
   return `<?xml version='1.0' encoding='utf-8'?>
 <!DOCTYPE GuiDocument>
 <Document SchemaVersion="1">
@@ -354,10 +357,11 @@ export async function exportFcstd(filename = 'house.FCStd') {
   }
 
   // FOUNDATION — shared pure derivation (foundation_geom.js), the same source
-  // of truth as the 3D preview. Each piece is a labeled box; pieces sit at z<=0.
+  // of truth as the 3D preview. Returns {slabParts, beamParts, skirtParts}.
+  // Beam sub-folder → visible; Skirt sub-folder → invisible by default.
   function foundationObjs() {
     const f = doc.entities.find(e => e.kind === 'foundation');
-    if (!f) return [];
+    if (!f) return { slabParts: [], beamParts: [], skirtParts: [] };
     const region = regionForLevel('L1');
     const fl1Walls = ents.filter(e => e.kind === 'wall' && (e.level || 'L1') === 'L1');
     const silhouette = {
@@ -366,40 +370,53 @@ export async function exportFcstd(filename = 'house.FCStd') {
       containsPoint: region.containsPoint,
       cell_mm: region.cells ? region.cells.cell_mm : undefined,
     };
-    const out = [];
+    const slabParts = [], beamParts = [], skirtParts = [];
     for (const pc of foundationSolids(f.params, silhouette)) {
       const { dx_mm: dx, dy_mm: dy, dz_mm: dz } = pc.dims;
-      const fx = pc.center.x_mm - minx;          // same world->FreeCAD transform
-      const fy = -(pc.center.y_mm - miny);       // as the walls; boxes are symmetric
+      const fx = pc.center.x_mm - minx;
+      const fy = -(pc.center.y_mm - miny);
       const fz = pc.center.z_mm;
-      out.push({ name: `foundation_${pc.label}`, label: `foundation_${pc.label}`,
-                 brep: boxBrep(dx, dy, dz, fx - dx / 2, fy - dy / 2, fz - dz / 2),
-                 color: pc.kind === 'skirt' ? COL_EPS : COL_CONCRETE });
-      // grow the camera frame to include this below-grade box
+      const obj = { name: `foundation_${pc.label}`, label: `foundation_${pc.label}`,
+                    brep: boxBrep(dx, dy, dz, fx - dx / 2, fy - dy / 2, fz - dz / 2),
+                    color: pc.kind === 'skirt' ? COL_EPS : COL_CONCRETE,
+                    visible: pc.kind !== 'skirt' }; // skirt hidden by default (per-part, not just folder)
       bounds.minX = Math.min(bounds.minX, fx - dx / 2); bounds.maxX = Math.max(bounds.maxX, fx + dx / 2);
       bounds.minY = Math.min(bounds.minY, fy - dy / 2); bounds.maxY = Math.max(bounds.maxY, fy + dy / 2);
       bounds.minZ = Math.min(bounds.minZ, fz - dz / 2);
+      if (pc.kind === 'slab')       slabParts.push(obj);
+      else if (pc.kind === 'beam')  beamParts.push(obj);
+      else                          skirtParts.push(obj);
     }
-    return out;
+    return { slabParts, beamParts, skirtParts };
   }
 
-  const TRADES = [
-    { trade: 'framing',    levelAware: true,  solids: framingObjs },
-    { trade: 'foundation', levelAware: false, solids: foundationObjs },
-  ];
   const levelsPresent = [...new Set(ents.map(e => e.level || 'L1'))];
 
   const parts = [], groups = [];
-  for (const t of TRADES) {
-    const emit = (objs, gname) => {
-      if (!objs.length) return;
-      parts.push(...objs);
-      groups.push({ name: gname, label: gname, children: objs.map(o => o.name) });
-    };
-    if (t.levelAware) {
-      for (const lvl of levelsPresent) emit(t.solids(lvl), `${cap(t.trade)}_${levelLabel(lvl)}`);
-    } else {
-      emit(t.solids(), cap(t.trade));
+  // Framing — one folder per level.
+  for (const lvl of levelsPresent) {
+    const objs = framingObjs(lvl);
+    if (!objs.length) continue;
+    const gname = `${cap('framing')}_${levelLabel(lvl)}`;
+    parts.push(...objs);
+    groups.push({ name: gname, label: gname, children: objs.map(o => o.name) });
+  }
+  // Foundation — slab / beam / skirt each in their own sub-folder under
+  // Foundation. Slab + beam visible; skirt invisible by default.
+  {
+    const { slabParts, beamParts, skirtParts } = foundationObjs();
+    if (slabParts.length || beamParts.length || skirtParts.length) {
+      parts.push(...slabParts, ...beamParts, ...skirtParts);
+      // Sub-folders first (must exist before the parent group references them).
+      if (slabParts.length)  groups.push({ name: 'Foundation_Slab',  label: 'Foundation_Slab',  children: slabParts.map(o => o.name),  visible: true });
+      if (beamParts.length)  groups.push({ name: 'Foundation_Beam',  label: 'Foundation_Beam',  children: beamParts.map(o => o.name),  visible: true });
+      if (skirtParts.length) groups.push({ name: 'Foundation_Skirt', label: 'Foundation_Skirt', children: skirtParts.map(o => o.name), visible: false });
+      const fndChildren = [
+        ...(slabParts.length  ? ['Foundation_Slab']  : []),
+        ...(beamParts.length  ? ['Foundation_Beam']  : []),
+        ...(skirtParts.length ? ['Foundation_Skirt'] : []),
+      ];
+      groups.push({ name: 'Foundation', label: 'Foundation', children: fndChildren });
     }
   }
 

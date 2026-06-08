@@ -188,6 +188,11 @@ MERGE_TOL = 1e-6   # mm — strip x/w/edge equality
 RUN_TOL = 2        # mm — end-to-end contiguity gap along a run
 RUN_BAND = 60      # mm — same-line cross-axis clustering
 
+# Beam top is 5 mm below the slab-top datum (z=0) to prevent z-fighting.
+BEAM_TOP_Z = -5
+# Gap between beam outer face and skirt inner face (= 1 inch).
+SKIRT_INSET_MM = 25.4
+
 
 def _merge_slab_rects(rects):
     """Greedy-merge per-row fill strips into MAXIMAL rectangles (port of
@@ -277,10 +282,10 @@ def _compute_runs(walls):
     return runs
 
 
-def _end_ext(r, a_end_val, all_runs, skirt_t):
-    """Extension for one run end. Returns P.depth + skirt_t if SUBMISSIVE (a perpendicular
-    run P butts r at that end — P's wall crosses r's line and P's cross band contains the
-    end coord), or 0 if DOMINANT (r reaches the building corner)."""
+def _classify_end(r, a_end_val, all_runs):
+    """Classify one end of run r: returns (submissive, perp_run) where perp_run is
+    the perpendicular dominant run that butts r at a_end_val (submissive=True), or
+    (False, None) if r reaches the building corner there (dominant)."""
     for p in all_runs:
         if p["horiz"] == r["horiz"]:
             continue
@@ -294,29 +299,29 @@ def _end_ext(r, a_end_val, all_runs, skirt_t):
             continue
         if a_end_val > p["near_cross"] + p["depth"] + RUN_TOL:
             continue
-        return p["depth"] + skirt_t
-    return 0
+        return True, p
+    return False, None
 
 
 def foundation_solids(params, silhouette):
     """Port of foundation_geom.js foundationSolids. Returns ordered list of
     piece dicts {group, kind, label, dims{dx_mm,dy_mm,dz_mm},
     center{x_mm,y_mm,z_mm}}. World plan mm, z-DOWN (top of slab = z=0).
-    Monolithic slab + one grade beam per run + one continuous frost skirt
-    per run (corner-extended so the FPSF loop is gapless)."""
+    Monolithic slab + grade-beam RING (per-run raw boxes union-decomposed into
+    non-overlapping rects, top at BEAM_TOP_Z) + frost-skirt LOOP (non-overlapping
+    boxes 1" outside the beam outer face)."""
     slab_t = params["slab_thickness_mm"]
     beam_w = params["beam_w_mm"]
     beam_d = params["beam_d_mm"]
-    skirt_d = params["skirt_depth_mm"]
+    # skirt_depth_mm: reserved for the future FPSF horizontal wing (insulated
+    # apron extending outward under grade). Wired through the params but not
+    # consumed here today.
+    _skirt_depth_reserved = params["skirt_depth_mm"]  # noqa: F841
     skirt_t = params["skirt_thickness_mm"]
 
     rects = silhouette.get("rects", [])
     walls = silhouette.get("walls", [])
     contains_point = silhouette["contains_point"]
-    cell = silhouette.get("cell_mm") or DEFAULT_CELL_MM
-    # 2 cells: clears the ≤1-cell over-mark from any-overlap WALL marking.
-    # ¾-cell probe can land in the over-mark band and misread as interior.
-    probe = cell * 2
 
     pieces = []
 
@@ -331,52 +336,124 @@ def foundation_solids(params, silhouette):
 
     runs = _compute_runs(walls)
 
-    # GRADE BEAM — one per run, full length, centered on the wall line.
+    # GRADE BEAM — per-run RAW boxes (per-end extended via _classify_end so corners
+    # are bridged; these OVERLAP at corners), then union-decomposed into a ring of
+    # NON-OVERLAPPING rects. Top at BEAM_TOP_Z. Raw boxes also seed the skirt.
+    # Extension: SUBMISSIVE end → P.depth/2 + beam_w/2; DOMINANT end → 0.
+    beam_raw_boxes = []
     for r in runs:
-        length = r["a_max"] - r["a_min"]
-        axis_c = (r["a_min"] + r["a_max"]) / 2
+        sub_min, p_min = _classify_end(r, r["a_min"], runs)
+        sub_max, p_max = _classify_end(r, r["a_max"], runs)
+        ext_min = p_min["depth"] / 2 + beam_w / 2 if sub_min else 0
+        ext_max = p_max["depth"] / 2 + beam_w / 2 if sub_max else 0
+        new_a_min = r["a_min"] - ext_min
+        new_a_max = r["a_max"] + ext_max
+        beam_len = new_a_max - new_a_min
+        axis_c = (new_a_min + new_a_max) / 2
         line_c = r["near_cross"] + r["depth"] / 2
+        dx = beam_len if r["horiz"] else beam_w
+        dy = beam_w if r["horiz"] else beam_len
+        cx = axis_c if r["horiz"] else line_c
+        cy = line_c if r["horiz"] else axis_c
+        beam_raw_boxes.append({"x0": cx - dx / 2, "y0": cy - dy / 2,
+                               "x1": cx + dx / 2, "y1": cy + dy / 2})
+
+    beam_center_z = BEAM_TOP_Z - beam_d / 2
+    for i, r in enumerate(_decompose_rects(
+            beam_raw_boxes, lambda x, y: _in_any(beam_raw_boxes, x, y))):
         pieces.append({
-            "group": "foundation", "kind": "beam", "label": "beam_%s" % r["letter"],
-            "dims": {"dx_mm": length if r["horiz"] else beam_w,
-                     "dy_mm": beam_w if r["horiz"] else length, "dz_mm": beam_d},
-            "center": ({"x_mm": axis_c, "y_mm": line_c, "z_mm": -beam_d / 2}
-                       if r["horiz"]
-                       else {"x_mm": line_c, "y_mm": axis_c, "z_mm": -beam_d / 2}),
+            "group": "foundation", "kind": "beam", "label": "beam_%02d" % i,
+            "dims": {"dx_mm": r["w_mm"], "dy_mm": r["h_mm"], "dz_mm": beam_d},
+            "center": {"x_mm": r["x_mm"] + r["w_mm"] / 2,
+                       "y_mm": r["y_mm"] + r["h_mm"] / 2, "z_mm": beam_center_z},
         })
 
-    # FROST SKIRT — one continuous panel per run on its OUTSIDE face.
-    # Per-end extension: SUBMISSIVE ends (a perp run butts there) extend by
-    # P.depth + skirt_t to bridge across P and overlap P's outer skirt;
-    # DOMINANT ends (run reaches the building corner) extend by 0.
-    # Result: gapless FPSF loop, no stub past any convex corner.
-    for r in runs:
-        orig_axis_c = (r["a_min"] + r["a_max"]) / 2  # probe along wall midpoint
-        ext_at_min = _end_ext(r, r["a_min"], runs, skirt_t)
-        ext_at_max = _end_ext(r, r["a_max"], runs, skirt_t)
-        new_a_min = r["a_min"] - ext_at_min
-        new_a_max = r["a_max"] + ext_at_max
-        grown = new_a_max - new_a_min
-        skirt_axis_c = (new_a_min + new_a_max) / 2
-        far_cross = r["near_cross"] + r["depth"]
-        if r["horiz"]:
-            near_out = not contains_point(orig_axis_c, r["near_cross"] - probe)
-            fy = (r["near_cross"] - skirt_t / 2) if near_out else (far_cross + skirt_t / 2)
-            pieces.append({
-                "group": "foundation", "kind": "skirt", "label": "skirt_%s" % r["letter"],
-                "dims": {"dx_mm": grown, "dy_mm": skirt_t, "dz_mm": skirt_d},
-                "center": {"x_mm": skirt_axis_c, "y_mm": fy, "z_mm": -skirt_d / 2},
-            })
-        else:
-            near_out = not contains_point(r["near_cross"] - probe, orig_axis_c)
-            fx = (r["near_cross"] - skirt_t / 2) if near_out else (far_cross + skirt_t / 2)
-            pieces.append({
-                "group": "foundation", "kind": "skirt", "label": "skirt_%s" % r["letter"],
-                "dims": {"dx_mm": skirt_t, "dy_mm": grown, "dz_mm": skirt_d},
-                "center": {"x_mm": fx, "y_mm": skirt_axis_c, "z_mm": -skirt_d / 2},
-            })
+    # FROST SKIRT — non-overlapping LOOP hugging the OUTSIDE of the beam ring.
+    # Z: top 1" below beam top, bottom aligned with beam bottom → height
+    # = beam_d - SKIRT_INSET_MM. Plan: 1" outside the beam outer face, skirt_t
+    # thick. Band = (in outer) and (not in inner) and EXTERIOR (drops inner-face
+    # band), union-decomposed into disjoint maximal rects.
+    out_d = SKIRT_INSET_MM + skirt_t
+    skirt_outer = [{"x0": b["x0"] - out_d, "y0": b["y0"] - out_d,
+                    "x1": b["x1"] + out_d, "y1": b["y1"] + out_d} for b in beam_raw_boxes]
+    skirt_inner = [{"x0": b["x0"] - SKIRT_INSET_MM, "y0": b["y0"] - SKIRT_INSET_MM,
+                    "x1": b["x1"] + SKIRT_INSET_MM, "y1": b["y1"] + SKIRT_INSET_MM}
+                   for b in beam_raw_boxes]
+    skirt_dz = beam_d - SKIRT_INSET_MM
+    skirt_center_z = (BEAM_TOP_Z - SKIRT_INSET_MM) - skirt_dz / 2
+
+    def _skirt_keep(x, y):
+        return (_in_any(skirt_outer, x, y) and not _in_any(skirt_inner, x, y)
+                and not contains_point(x, y))
+
+    for i, r in enumerate(_decompose_rects(skirt_outer + skirt_inner, _skirt_keep)):
+        pieces.append({
+            "group": "foundation", "kind": "skirt", "label": "skirt_%02d" % i,
+            "dims": {"dx_mm": r["w_mm"], "dy_mm": r["h_mm"], "dz_mm": skirt_dz},
+            "center": {"x_mm": r["x_mm"] + r["w_mm"] / 2,
+                       "y_mm": r["y_mm"] + r["h_mm"] / 2, "z_mm": skirt_center_z},
+        })
 
     return pieces
+
+
+def _in_any(boxes, x, y):
+    """True if (x,y) lies strictly inside any plan box {x0,y0,x1,y1}."""
+    return any(b["x0"] < x < b["x1"] and b["y0"] < y < b["y1"] for b in boxes)
+
+
+def _decompose_rects(coord_boxes, keep):
+    """Decompose a rectilinear region into DISJOINT maximal rectangles (port of
+    foundation_geom.js decomposeRects). `coord_boxes` supplies candidate edge
+    coordinates; `keep(cx,cy)` decides whether a compressed cell is in the region.
+    Used for BOTH the beam ring (keep = inside the beam-box union) and the frost
+    skirt (keep = outer band, not inner band, exterior).
+
+    Coordinate compression makes cell edges land exactly on real boundaries
+    (exact dims); a tolerance-dedupe (snap) collapses float-noise duplicate edges
+    from corner overlaps (else zero-area sliver boxes); a greedy
+    horizontal-then-vertical merge yields the disjoint maximal-rectangle cover."""
+    if not coord_boxes:
+        return []
+    snap = 1e-3  # mm — far below any real dim, far above float noise
+
+    def dedup(vals):
+        out = []
+        for v in vals:
+            if not out or v - out[-1] > snap:
+                out.append(v)
+        return out
+
+    xs_all, ys_all = [], []
+    for b in coord_boxes:
+        xs_all.append(b["x0"]); xs_all.append(b["x1"])
+        ys_all.append(b["y0"]); ys_all.append(b["y1"])
+    xs = dedup(sorted(xs_all))
+    ys = dedup(sorted(ys_all))
+
+    # one unit rect per kept cell, row-major (ascending y, then x)
+    cells = []
+    for j in range(len(ys) - 1):
+        y0, y1 = ys[j], ys[j + 1]
+        cy = (y0 + y1) / 2
+        for i in range(len(xs) - 1):
+            x0, x1 = xs[i], xs[i + 1]
+            cx = (x0 + x1) / 2
+            if keep(cx, cy):
+                cells.append({"x_mm": x0, "y_mm": y0, "w_mm": x1 - x0, "h_mm": y1 - y0})
+
+    # horizontal merge: stitch contiguous same-row, same-height cells
+    hmerged = []
+    for c in cells:
+        last = hmerged[-1] if hmerged else None
+        if (last and abs(last["y_mm"] - c["y_mm"]) < MERGE_TOL
+                and abs(last["h_mm"] - c["h_mm"]) < MERGE_TOL
+                and abs((last["x_mm"] + last["w_mm"]) - c["x_mm"]) < MERGE_TOL):
+            last["w_mm"] += c["w_mm"]
+        else:
+            hmerged.append(dict(c))
+    # vertical merge: stack equal x+w rows (reuse the slab merger)
+    return _merge_slab_rects(hmerged)
 
 
 def silhouette_for_walls(walls, cell_mm=REGION_CELL_MM):
