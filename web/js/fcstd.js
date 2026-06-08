@@ -420,7 +420,9 @@ export async function exportFcstd(filename = 'house.FCStd') {
     }
   }
 
-  const { default: JSZip } = await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm');
+  // Vendored locally (web/vendor/) so offline shop/site deployments can export
+  // FCStd with no CDN/network dependency. See CAD-AUD-012.
+  const { default: JSZip } = await import('../vendor/jszip.min.mjs');
   const zip = new JSZip();
   zip.file('Document.xml', documentXml(parts, groups));
   // FreeCAD is sensitive to member order here: if GuiDocument.xml is restored
