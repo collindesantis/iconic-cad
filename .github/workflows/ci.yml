@@ -41,15 +41,9 @@ jobs:
           node tests/ci_verify_gate.mjs
           node tests/export_gate.mjs
 
-      - name: Install FreeCAD (for BREP geometry verify)
-        run: sudo apt-get update && sudo apt-get install -y freecad
-
-      # CAD-AUD-009 gate: the browser FreeCAD export translates pre-baked BREP
-      # assets, NOT enumerateMembers() at runtime. This step fails CI if those
-      # committed BREP assets drift from the generator, so a framing change can
-      # never silently diverge from FreeCAD export.
-      - name: Verify BREP assets match the generator
-        run: python build_lib.py --verify --no-thumbs
-
       - name: Check Markdown relative links
         run: python scripts/check_links.py
+
+  # FreeCAD BREP verify is heavy (large apt install). It only matters when the
+  # geometry generator or its baked assets change, so it runs as a separate
+  # path-filtered job — see .github/workflows/geometry-verify.yml.

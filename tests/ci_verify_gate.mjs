@@ -5,7 +5,7 @@
  *
  * Run from repo root: node tests/ci_verify_gate.mjs   (no FreeCAD needed)
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 let passed = 0, failed = 0;
@@ -14,10 +14,17 @@ const ok = m => { passed++; if (process.env.VERBOSE) console.log(`  ok ${m}`); }
 const read = rel => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 
 const VERIFY = /build_lib\.py --verify --no-thumbs/;
-for (const ci of ['../.github/workflows/ci.yml', '../.gitlab-ci.yml']) {
-  if (VERIFY.test(read(ci))) ok(`${ci} runs build_lib --verify --no-thumbs`);
-  else fail(`${ci} missing build_lib --verify gate`);
-}
+
+// GitHub: the verify gate may live in ANY workflow file (it was split into a
+// path-filtered geometry-verify.yml job). Assert it exists somewhere.
+const ghDir = fileURLToPath(new URL('../.github/workflows/', import.meta.url));
+const ghHasVerify = readdirSync(ghDir).some(f => VERIFY.test(readFileSync(ghDir + f, 'utf8')));
+if (ghHasVerify) ok('a GitHub workflow runs build_lib --verify --no-thumbs');
+else fail('no GitHub workflow runs the build_lib --verify gate');
+
+// GitLab: single config file.
+if (VERIFY.test(read('../.gitlab-ci.yml'))) ok('.gitlab-ci.yml runs build_lib --verify --no-thumbs');
+else fail('.gitlab-ci.yml missing build_lib --verify gate');
 
 const members = read('../web/js/members.js');
 // the corrected comment must state the real architecture (BREP translation)…

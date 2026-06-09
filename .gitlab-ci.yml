@@ -36,14 +36,40 @@ test:
     - node tests/fcstd_local_jszip.mjs
     - node tests/ci_verify_gate.mjs
     - node tests/export_gate.mjs
-    # CAD-AUD-009 gate: committed BREP assets must not drift from the generator
-    # (browser FreeCAD export translates pre-baked BREPs, not enumerateMembers()).
-    - apt-get install -y -qq freecad
-    - python build_lib.py --verify --no-thumbs
     - python scripts/check_links.py
   rules:
     - if: $CI_PIPELINE_SOURCE == "push"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+# CAD-AUD-009 gate: the browser FreeCAD export translates PRE-BAKED BREP assets,
+# not enumerateMembers() at runtime, so committed assets must not drift from the
+# generator. FreeCAD is a large apt install, so this runs ONLY when the generator,
+# its baked assets, or the spec inputs change — not on every push. apt archives
+# are cached so reruns skip the cold download.
+verify-geometry:
+  stage: test
+  variables:
+    APT_CACHE_DIR: "$CI_PROJECT_DIR/.apt-cache"
+  cache:
+    key: apt-freecad
+    paths:
+      - .apt-cache/
+  before_script:
+    - mkdir -p "$APT_CACHE_DIR" && apt-get update -qq
+    - apt-get -o dir::cache::archives="$APT_CACHE_DIR" install -y -qq freecad
+    - pip install --quiet -r requirements.txt -r requirements-dev.txt
+  script:
+    - python build_lib.py --verify --no-thumbs
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" || $CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - generate_wall_library.py
+        - build_lib.py
+        - scripts/bake_geometry.py
+        - scripts/gen_specs.py
+        - wall_instances.yaml
+        - web/assets/lib/**/*
+        - .gitlab-ci.yml
 
 pages:
   stage: deploy

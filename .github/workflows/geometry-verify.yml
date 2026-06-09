@@ -1,0 +1,47 @@
+name: Geometry Verify
+
+# CAD-AUD-009 gate. The browser FreeCAD export translates PRE-BAKED BREP assets
+# (web/assets/lib/*.brp), not enumerateMembers() at runtime, so a framing/geometry
+# change that forgets to regenerate those assets would silently diverge from the
+# web 3D/BOM/fab outputs. `build_lib.py --verify` fails if the committed assets no
+# longer match the generator.
+#
+# This needs FreeCAD (a large apt install), so it runs ONLY when the generator,
+# its baked assets, or the spec inputs change — not on every push. The fast lane
+# (ci.yml: JS + pytest + specs diff) still runs on all pushes.
+on:
+  push:
+    paths: &geom_paths
+      - 'generate_wall_library.py'
+      - 'build_lib.py'
+      - 'scripts/bake_geometry.py'
+      - 'scripts/gen_specs.py'
+      - 'wall_instances.yaml'
+      - 'web/assets/lib/**'
+      - '.github/workflows/geometry-verify.yml'
+  pull_request:
+    paths: *geom_paths
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python deps
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      # Caches the FreeCAD .deb + its dependencies so reruns skip the cold
+      # multi-hundred-MB download. First run on a new cache key is still slow.
+      - name: Install FreeCAD (cached apt)
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: freecad
+          version: 1.0
+
+      - name: Verify BREP assets match the generator
+        run: python build_lib.py --verify --no-thumbs
