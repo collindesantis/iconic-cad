@@ -35,13 +35,14 @@ jobs:
       - name: Install Python deps
         run: pip install -r requirements.txt -r requirements-dev.txt
 
-      # Caches the FreeCAD .deb + its dependencies so reruns skip the cold
-      # multi-hundred-MB download. First run on a new cache key is still slow.
-      - name: Install FreeCAD (cached apt)
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: freecad
-          version: 1.0
+      # cache-apt-pkgs-action restored a cache without putting freecadcmd on
+      # PATH (the verify step failed with "freecadcmd not found"), so install
+      # the distro package directly. This only runs on geometry-path changes.
+      - name: Install FreeCAD
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq freecad
+          command -v freecadcmd
 
       - name: Verify BREP assets match the generator
         run: python build_lib.py --verify --no-thumbs
