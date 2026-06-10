@@ -35,11 +35,13 @@ jobs:
       - name: Install Python deps
         run: pip install -r requirements.txt -r requirements-dev.txt
 
-      # cache-apt-pkgs-action restored a cache without putting freecadcmd on
-      # PATH (the verify step failed with "freecadcmd not found"), so install
-      # the distro package directly. This only runs on geometry-path changes.
+      # ubuntu-latest has no `freecad` apt candidate, so pull it from the
+      # FreeCAD stable PPA, which ships freecadcmd on PATH. (cache-apt-pkgs-action
+      # previously restored a cache with no freecadcmd at all.) This step only
+      # runs on geometry-path changes.
       - name: Install FreeCAD
         run: |
+          sudo add-apt-repository -y ppa:freecad-maintainers/freecad-stable
           sudo apt-get update -qq
           sudo apt-get install -y -qq freecad
           command -v freecadcmd
